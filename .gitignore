@@ -1,0 +1,92 @@
+# --- IDE / project metadata ---
+/.idea/
+/shelf/
+/.idea/workspace.xml
+# Editor-based HTTP Client requests
+/httpRequests/
+# Datasource local storage ignored files
+/dataSources/
+/dataSources.local.xml
+
+# --- OS / editor junk ---
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# --- Maven / Java build outputs ---
+**/target/
+!.mvn/wrapper/maven-wrapper.jar
+
+# Maven release / backup files
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+release.properties
+
+# --- Gradle (just in case) ---
+.gradle/
+**/build/
+
+# --- IntelliJ IDEA ---
+*.iml
+*.ipr
+*.iws
+out/
+
+# --- Eclipse ---
+.project
+.classpath
+.settings/
+
+# --- VS Code ---
+.vscode/
+
+# --- Logs & runtime files ---
+logs/
+**/*.log
+*.pid
+
+# --- Protobuf / gRPC generated sources (build dir already ignored, but be explicit) ---
+**/generated-sources/
+**/generated-test-sources/
+
+# --- Local environment / secrets ---
+.env
+*.env
+.env.*
+
+# --- Docker / Compose artifacts ---
+*.tar
+*.dockerfile.swp
+
+# --- Coverage / reports ---
+**/surefire-reports/
+**/failsafe-reports/
+**/jacoco.exec
+**/jacoco-report/
+
+# --- Temporary files ---
+.tmp/
+.temp/
+
+# --- Mac OS metadata ---
+.AppleDouble
+.LSOverride
+Icon?
+._*
+
+# --- Java language server caches ---
+.jdtls/
+
+# --- Ignore compiled classes in repo root if any ---
+*.class
+
+# --- Local build outputs copied alongside jars ---
+**/*.original
+
+# --- Project scripts ---
+# allow tracking scripts, but ignore local overrides
+/scripts/env.local.sh
+/scripts/env.sh

@@ -1,0 +1,36 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Cloud Map Namespace Stack: Private DNS Namespace for service discovery'
+
+Parameters:
+  Env:
+    Type: String
+    Description: 'Environment name (e.g. dev, prod)'
+    Default: 'dev'
+
+
+
+Resources:
+  PrivateDnsNamespace:
+    Type: AWS::ServiceDiscovery::PrivateDnsNamespace
+    Properties:
+      Name: !Sub '${Env}.local'
+      Vpc: !ImportValue 'network-stack-VpcId'
+      Description: !Sub 'Private DNS namespace for ${Env} environment'
+      Tags:
+        - Key: Name
+          Value: !Sub '${Env}-namespace'
+        - Key: Environment
+          Value: !Ref Env
+
+Outputs:
+  NamespaceId:
+    Description: 'Cloud Map Namespace ID'
+    Value: !Ref PrivateDnsNamespace
+    Export:
+      Name: !Sub '${AWS::StackName}-namespace-id'
+
+  NamespaceName:
+    Description: 'Cloud Map Namespace Name'
+    Value: !Sub '${Env}.local'
+    Export:
+      Name: !Sub '${AWS::StackName}-namespace-name'

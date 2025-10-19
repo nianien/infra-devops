@@ -1,0 +1,213 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Infrastructure Pipeline: Deploy shared infrastructure stacks (Network, Namespace, ServiceDiscovery, Log, ALB)'
+
+Parameters:
+  # =========================================================
+  # Required Parameters
+  # =========================================================
+  PipelineName:
+    Type: String
+    Description: 'Infrastructure Pipeline name (format: infra-<env>)'
+
+  Env:
+    Type: String
+    Default: 'dev'
+    AllowedValues: [ dev, test, preonline, online ]
+    Description: 'Environment name'
+
+  # =========================================================
+  # Optional Parameters
+  # =========================================================
+  ConnectionArn:
+    Type: String
+    Default: 'arn:aws:codeconnections:us-east-1:297997107448:connection/9adfd918-2843-4147-9bc9-c4ee1a99bc39'
+    Description: 'CodeStar connection ARN (GitHub integration)'
+
+  ArtifactBucketName:
+    Type: String
+    Default: 'codepipeline-us-east-1-3622cd43956e-4d23-9284-a18746ff6c07'
+    Description: 'S3 artifact bucket for CodePipeline artifacts'
+
+  CloudFormationDeployRoleArn:
+    Type: String
+    Description: 'IAM Role ARN for CloudFormation deployments'
+
+  CodePipelineRoleArn:
+    Type: String
+    Description: 'IAM Role ARN for CodePipeline'
+
+  # =========================================================
+  # Network Parameters
+  # =========================================================
+  VpcCidr:
+    Type: String
+    Default: '10.0.0.0/16'
+    Description: 'VPC CIDR block'
+
+  PublicSubnetCidr1:
+    Type: String
+    Default: '10.0.1.0/24'
+    Description: 'Public subnet 1 CIDR block'
+
+  PublicSubnetCidr2:
+    Type: String
+    Default: '10.0.2.0/24'
+    Description: 'Public subnet 2 CIDR block'
+
+  PrivateSubnetCidr1:
+    Type: String
+    Default: '10.0.11.0/24'
+    Description: 'Private subnet 1 CIDR block'
+
+  PrivateSubnetCidr2:
+    Type: String
+    Default: '10.0.12.0/24'
+    Description: 'Private subnet 2 CIDR block'
+
+Resources:
+  Pipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      Name: !Ref PipelineName
+      RoleArn: !Ref CodePipelineRoleArn
+      ArtifactStore:
+        Type: S3
+        Location: !Ref ArtifactBucketName
+
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: GitHubSource
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Provider: CodeStarSourceConnection
+                Version: '1'
+              Configuration:
+                ConnectionArn: !Ref ConnectionArn
+                FullRepositoryId: 'nianien/infra-experimental'
+                BranchName: 'master'
+                OutputArtifactFormat: CODE_ZIP
+                DetectChanges: false
+              OutputArtifacts:
+                - Name: SourceOut
+
+        - Name: DeployNetwork
+          Actions:
+            - Name: CFNDeployNetwork
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CloudFormation
+                Version: '1'
+              InputArtifacts:
+                - Name: SourceOut
+              Configuration:
+                ActionMode: CREATE_UPDATE
+                StackName: 'network-stack'
+                TemplatePath: 'SourceOut::ci/network-shared-stack.yaml'
+                RoleArn: !Ref CloudFormationDeployRoleArn
+                Capabilities: 'CAPABILITY_IAM,CAPABILITY_NAMED_IAM'
+                ParameterOverrides: !Sub |
+                  {
+                    "Env": "${Env}",
+                    "VpcCidr": "${VpcCidr}",
+                    "PublicSubnetCidr1": "${PublicSubnetCidr1}",
+                    "PublicSubnetCidr2": "${PublicSubnetCidr2}",
+                    "PrivateSubnetCidr1": "${PrivateSubnetCidr1}",
+                    "PrivateSubnetCidr2": "${PrivateSubnetCidr2}"
+                  }
+
+        - Name: DeployNamespace
+          Actions:
+            - Name: CFNDeployNamespace
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CloudFormation
+                Version: '1'
+              InputArtifacts:
+                - Name: SourceOut
+              Configuration:
+                ActionMode: CREATE_UPDATE
+                StackName: 'sd-namespace-shared'
+                TemplatePath: 'SourceOut::ci/namespace-shared-stack.yaml'
+                RoleArn: !Ref CloudFormationDeployRoleArn
+                Capabilities: 'CAPABILITY_IAM,CAPABILITY_NAMED_IAM'
+                ParameterOverrides: !Sub |
+                  {
+                    "Env": "${Env}"
+                  }
+
+        - Name: DeployServiceDiscovery
+          Actions:
+            - Name: CFNDeployServiceDiscovery
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CloudFormation
+                Version: '1'
+              InputArtifacts:
+                - Name: SourceOut
+              Configuration:
+                ActionMode: CREATE_UPDATE
+                StackName: !Sub 'sd-service-shared-${Env}'
+                TemplatePath: 'SourceOut::ci/sd-shared-stack.yaml'
+                RoleArn: !Ref CloudFormationDeployRoleArn
+                Capabilities: 'CAPABILITY_IAM,CAPABILITY_NAMED_IAM'
+                ParameterOverrides: !Sub |
+                  {
+                    "ServiceName": "${Env}",
+                    "Env": "${Env}",
+                    "NamespaceStackName": "sd-namespace-shared"
+                  }
+
+        - Name: DeployLog
+          Actions:
+            - Name: CFNDeployLog
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CloudFormation
+                Version: '1'
+              InputArtifacts:
+                - Name: SourceOut
+              Configuration:
+                ActionMode: CREATE_UPDATE
+                StackName: !Sub 'log-shared-${Env}'
+                TemplatePath: 'SourceOut::ci/log-shared-stack.yaml'
+                RoleArn: !Ref CloudFormationDeployRoleArn
+                Capabilities: 'CAPABILITY_IAM,CAPABILITY_NAMED_IAM'
+                ParameterOverrides: !Sub |
+                  {
+                    "ServiceName": "${Env}",
+                    "Env": "${Env}"
+                  }
+
+        - Name: DeployAlb
+          Actions:
+            - Name: CFNDeployAlb
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CloudFormation
+                Version: '1'
+              InputArtifacts:
+                - Name: SourceOut
+              Configuration:
+                ActionMode: CREATE_UPDATE
+                StackName: !Sub 'alb-shared-${Env}'
+                TemplatePath: 'SourceOut::ci/alb-shared-stack.yaml'
+                RoleArn: !Ref CloudFormationDeployRoleArn
+                Capabilities: 'CAPABILITY_IAM,CAPABILITY_NAMED_IAM'
+                ParameterOverrides: !Sub |
+                  {
+                    "ServiceName": "${Env}",
+                    "Env": "${Env}"
+                  }
+
+      RestartExecutionOnUpdate: true
+
+Outputs:
+  PipelineNameOut:
+    Value: !Ref PipelineName

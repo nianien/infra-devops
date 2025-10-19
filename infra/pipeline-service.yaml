@@ -1,0 +1,193 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Service Pipeline: Source → Build → Deploy Service (consumes shared infrastructure)'
+
+Parameters:
+  # =========================================================
+  # Required Parameters
+  # =========================================================
+  PipelineName:
+    Type: String
+    Description: 'CodePipeline name (format: <service>-<env>)'
+
+  ServiceName:
+    Type: String
+    Description: 'ECS service name (e.g. demo-rpc or demo-api)'
+
+  RepoName:
+    Type: String
+    Description: 'GitHub repository (format: <org>/<repo>)'
+
+  Env:
+    Type: String
+    Default: 'default'
+    AllowedValues: [ default, dev, test, preonline, online ]
+    Description: 'Deployment environment (allowed: default, dev, test, preonline, online)'
+
+  # =========================================================
+  # Optional Parameters
+  # =========================================================
+  DefaultBranch:
+    Type: String
+    Default: 'main'
+    Description: 'Git default branch'
+
+  DefaultLane:
+    Type: String
+    Default: 'default'
+    Description: 'default lane name'
+
+  ModulePath:
+    Type: String
+    Default: '.'
+    Description: 'Module path (relative to project root)'
+
+  ConnectionArn:
+    Type: String
+    Default: 'arn:aws:codeconnections:us-east-1:297997107448:connection/9adfd918-2843-4147-9bc9-c4ee1a99bc39'
+    Description: 'CodeStar connection ARN (GitHub integration)'
+
+  ArtifactBucketName:
+    Type: String
+    Default: 'codepipeline-us-east-1-3622cd43956e-4d23-9284-a18746ff6c07'
+    Description: 'S3 artifact bucket for CodePipeline artifacts'
+
+  BuildSpec:
+    Type: String
+    Default: 'ci/buildspec.yaml'
+    Description: 'CodeBuild buildspec file path (relative to source root)'
+
+  ContainerImage:
+    Type: String
+    Description: 'Container image for CodeBuild (e.g., aws/codebuild/standard:7.0)'
+
+  CloudFormationDeployRoleArn:
+    Type: String
+    Description: 'IAM Role ARN for CloudFormation deployments'
+
+  CodePipelineRoleArn:
+    Type: String
+    Description: 'IAM Role ARN for CodePipeline'
+
+  CodeBuildRoleArn:
+    Type: String
+    Description: 'IAM Role ARN for CodeBuild'
+
+Resources:
+  CodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub '${PipelineName}-build'
+      Description: !Sub 'CodeBuild project for ${PipelineName}'
+      ServiceRole: !Ref CodeBuildRoleArn
+      Artifacts:
+        Type: CODEPIPELINE
+        Name: BuildOut
+      Environment:
+        Type: LINUX_CONTAINER
+        Image: !Ref ContainerImage
+        ComputeType: BUILD_GENERAL1_SMALL
+        PrivilegedMode: true
+        EnvironmentVariables:
+          - Name: MODULE_PATH
+            Type: PLAINTEXT
+            Value: !Ref ModulePath
+          - Name: SERVICE_NAME
+            Type: PLAINTEXT
+            Value: !Ref ServiceName
+          - Name: APP_ENV
+            Type: PLAINTEXT
+            Value: !Ref Env
+          - Name: LANE
+            Type: PLAINTEXT
+            Value: "#{variables.LANE}"
+          - Name: BRANCH
+            Type: PLAINTEXT
+            Value: "#{variables.BRANCH}"
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: !Ref BuildSpec
+      TimeoutInMinutes: 60
+
+  Pipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      Name: !Ref PipelineName
+      RoleArn: !Ref CodePipelineRoleArn
+      ArtifactStore:
+        Type: S3
+        Location: !Ref ArtifactBucketName
+
+      Variables:
+        - Name: LANE
+          DefaultValue: !Ref DefaultLane
+          Description: 'Lane name'
+        - Name: BRANCH
+          DefaultValue: !Ref DefaultBranch
+          Description: 'Branch name'
+
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: GitHubSource
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Provider: CodeStarSourceConnection
+                Version: '1'
+              Configuration:
+                ConnectionArn: !Ref ConnectionArn
+                FullRepositoryId: !Ref RepoName
+                BranchName: "#{variables.BRANCH}"
+                OutputArtifactFormat: CODE_ZIP
+                DetectChanges: false
+              OutputArtifacts:
+                - Name: SourceOut
+
+        - Name: Build
+          Actions:
+            - Name: CodeBuild
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              InputArtifacts:
+                - Name: SourceOut
+              OutputArtifacts:
+                - Name: BuildOut
+              Configuration:
+                ProjectName: !Ref CodeBuildProject
+              RunOrder: 1
+
+        - Name: DeployService
+          Actions:
+            - Name: CFNDeployService
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CloudFormation
+                Version: '1'
+              InputArtifacts:
+                - Name: SourceOut
+                - Name: BuildOut
+              Configuration:
+                ActionMode: CREATE_UPDATE
+                StackName: !Sub 'app-${ServiceName}-${Env}-#{variables.LANE}'
+                TemplatePath: 'SourceOut::ci/service-stack.yaml'
+                TemplateConfiguration: 'BuildOut::cfn-params.json'
+                RoleArn: !Ref CloudFormationDeployRoleArn
+                Capabilities: 'CAPABILITY_IAM,CAPABILITY_NAMED_IAM'
+                ParameterOverrides: !Sub |
+                  {
+                    "ServiceName": "${ServiceName}",
+                    "Env": "${Env}",
+                    "Lane": "#{variables.LANE}"
+                  }
+
+      RestartExecutionOnUpdate: true
+
+Outputs:
+  PipelineNameOut:
+    Value: !Ref PipelineName
+  CodeBuildProjectOut:
+    Value: !Ref CodeBuildProject

@@ -1,0 +1,99 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'ALB Stack: Application Load Balancer + Default Target Group (shared infrastructure)'
+
+Parameters:
+  ServiceName:
+    Type: String
+    Description: 'Service name (e.g. user-service)'
+
+  Env:
+    Type: String
+    Default: 'dev'
+    Description: 'Environment name'
+
+  HealthCheckPort:
+    Type: Number
+    Default: 8080
+    Description: 'Target group health check port'
+
+  HealthCheckPath:
+    Type: String
+    Default: '/health'
+    Description: 'Target group health check path'
+
+
+Resources:
+  AlbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub 'ALB SG for ${ServiceName}'
+      VpcId: !ImportValue 'network-stack-VpcId'
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub '${ServiceName}-alb-sg'
+
+  ApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub '${ServiceName}-${Env}-alb'
+      Scheme: internet-facing
+      Type: application
+      Subnets: !ImportValue 'network-stack-PublicSubnets'
+      SecurityGroups:
+        - !Ref AlbSecurityGroup
+
+  DefaultTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub '${ServiceName}-${Env}-default-tg'
+      VpcId: !ImportValue 'network-stack-VpcId'
+      TargetType: ip
+      Protocol: HTTP
+      Port: !Ref HealthCheckPort
+      HealthCheckEnabled: true
+      HealthCheckProtocol: HTTP
+      HealthCheckPath: !Ref HealthCheckPath
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+
+  HttpListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref DefaultTargetGroup
+
+Outputs:
+  LoadBalancerArn:
+    Description: 'Application Load Balancer ARN'
+    Value: !Ref ApplicationLoadBalancer
+    Export:
+      Name: !Sub '${AWS::StackName}-LoadBalancerArn'
+
+  LoadBalancerDnsName:
+    Description: 'Application Load Balancer DNS name'
+    Value: !GetAtt ApplicationLoadBalancer.DNSName
+    Export:
+      Name: !Sub '${AWS::StackName}-DnsName'
+
+  HttpListenerArn:
+    Description: 'HTTP Listener ARN'
+    Value: !Ref HttpListener
+    Export:
+      Name: !Sub '${AWS::StackName}-HttpListenerArn'
+
+  DefaultTargetGroupArn:
+    Description: 'Default Target Group ARN'
+    Value: !Ref DefaultTargetGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-DefaultTargetGroupArn'

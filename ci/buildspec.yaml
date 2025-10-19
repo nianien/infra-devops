@@ -1,0 +1,100 @@
+version: 0.2
+
+env:
+  shell: bash
+  variables:
+    MODULE_PATH: "."                  # 构建上下文目录（默认值，可被 Pipeline 变量覆盖）
+    DOCKERFILE_PATH: "ci/Dockerfile"  # Dockerfile 相对路径（可被 Pipeline 变量覆盖）
+    SKIP_TESTS: "1"                   # 1=跳过测试；0=执行（Pipeline 可覆盖）
+
+phases:
+  install:
+    runtime-versions:
+      java: corretto21   # Java 21 构建环境（仅在检测到 pom.xml 时使用）
+
+  pre_build:
+    commands:
+      - |-
+        set -euo pipefail
+
+        echo "== Environment variables check =="
+        echo "MODULE_PATH=${MODULE_PATH:-.}"
+        echo "SERVICE_NAME=${SERVICE_NAME:-}"
+        echo "APP_ENV=${APP_ENV:-}"
+        echo "LANE=${LANE:-}"
+        echo "BRANCH=${BRANCH:-}"
+        test -n "${SERVICE_NAME:-}" || { echo "[FATAL] Missing SERVICE_NAME (from pipeline.yaml)"; exit 1; }
+        test -n "${APP_ENV:-}" || { echo "[FATAL] Missing APP_ENV (from pipeline.yaml)"; exit 1; }
+        test -n "${LANE:-}" || { echo "[FATAL] Missing LANE (from pipeline variables)"; exit 1; }
+        test -n "${BRANCH:-}" || { echo "[FATAL] Missing BRANCH (from pipeline variables)"; exit 1; }
+        # 计算 ECR_REPO_URI
+        ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
+        AWS_REGION="${AWS_REGION:-${AWS_DEFAULT_REGION:-us-east-1}}"
+        ECR_REPO_URI="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${SERVICE_NAME}"
+        export ECR_REPO_URI
+        
+        echo "== Login to ECR and ensure repository exists =="
+        REGISTRY_HOST="${ECR_REPO_URI%%/*}"
+        REPO_NAME="${ECR_REPO_URI#*/}"
+        aws ecr describe-repositories --repository-names "$REPO_NAME" --region "$AWS_REGION" >/dev/null 2>&1 \
+        || aws ecr create-repository --repository-name "$REPO_NAME" --region "$AWS_REGION" >/dev/null
+        aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$REGISTRY_HOST"
+        
+        echo "== Generating image tag =="
+        COMMIT7="$(echo "${CODEBUILD_RESOLVED_SOURCE_VERSION:-}" | cut -c1-7 || true)"
+        TIMESTAMP="$(date +%Y%m%d%H%M%S)"
+        IMAGE_TAG="${TIMESTAMP}.${COMMIT7:-latest}"
+        export IMAGE_TAG
+        echo "==> IMAGE_TAG=$IMAGE_TAG"
+
+  build:
+    commands:
+      - |-
+        echo "== Checking build directory and Dockerfile =="
+        WORK_DIR="${MODULE_PATH:-.}"
+        DF="${DOCKERFILE_PATH:-Dockerfile}"   # 优先使用环境变量，否则默认 Dockerfile
+        if [[ -f "$MODULE_PATH/$DF" ]]; then  # 如果模块目录下存在该文件
+          DF="$MODULE_PATH/$DF"               # 优先使用模块内的 Dockerfile
+        fi
+        test -d "$WORK_DIR" || { echo "[FATAL] MODULE_PATH not found: $WORK_DIR"; exit 2; }
+        test -f "$DF" || { echo "[FATAL] Dockerfile not found: $DF"; exit 3; }
+
+        if [[ "$MODULE_PATH" == "." ]]; then
+          mvn -B $( [[ "$SKIP_TESTS" == "1" ]] && echo -DskipTests ) clean package
+        else
+          mvn -B $( [[ "$SKIP_TESTS" == "1" ]] && echo -DskipTests ) -pl .,"$MODULE_PATH" -am clean package
+        fi
+
+        find "$WORK_DIR/target" -maxdepth 1 -type f -name "*.jar" \
+          ! -name "*-sources.jar" ! -name "*-javadoc.jar" ! -name "*-tests.jar" \
+          | head -n1 | grep -q . || { echo "[FATAL] No runnable jar found"; exit 4; }
+
+        echo "== Docker build & push =="
+        IMAGE_TAG_URI="$ECR_REPO_URI:$IMAGE_TAG"
+        # 环境变量来自 pipeline
+        docker build -f "$DF" -t "$IMAGE_TAG_URI" "$WORK_DIR"
+        docker push "$IMAGE_TAG_URI"
+
+        echo "== Syncing tag :latest =="
+        LATEST_URI="$ECR_REPO_URI:latest"
+        docker tag "$IMAGE_TAG_URI" "$LATEST_URI"
+        docker push "$LATEST_URI"
+  post_build:
+    commands:
+      - |-
+        echo "== Output CloudFormation parameters file =="
+        # 导出参数到 cfn-params.json，供 DeployService 使用
+        # 只包含动态生成的参数，静态参数通过 pipeline.yaml 的 ParameterOverrides 传递
+        cat > cfn-params.json <<EOF
+        {
+          "Parameters": {
+            "ImageUri": "$IMAGE_TAG_URI"
+          }
+        }
+        EOF
+        echo "Generated cfn-params.json with parameters:"
+        cat cfn-params.json
+
+artifacts:
+  files:
+    - cfn-params.json

@@ -1,0 +1,89 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Service Discovery Service Stack: Cloud Map Service only (references existing namespace)'
+
+Parameters:
+  ServiceName:
+    Type: String
+    Description: 'Service name to create in Cloud Map (e.g. user-service)'
+
+  Env:
+    Type: String
+    Description: 'Environment name (e.g. dev, prod)'
+    Default: 'dev'
+
+  NamespaceStackName:
+    Type: String
+    Description: 'Namespace stack name for ImportValue reference'
+
+
+  DnsRecordType:
+    Type: String
+    Description: 'DNS record type for service discovery'
+    Default: 'SRV'
+    AllowedValues: ['SRV', 'A', 'AAAA']
+
+  DnsTtl:
+    Type: Number
+    Description: 'DNS TTL in seconds'
+    Default: 30
+    MinValue: 5
+    MaxValue: 300
+
+  HealthCheckFailureThreshold:
+    Type: Number
+    Description: 'Health check failure threshold'
+    Default: 1
+    MinValue: 1
+    MaxValue: 10
+
+Resources:
+  ServiceDiscoveryService:
+    Type: AWS::ServiceDiscovery::Service
+    Properties:
+      Name: !Ref ServiceName
+      NamespaceId: !ImportValue
+        Fn::Sub: '${NamespaceStackName}-namespace-id'
+      Description: !Sub 'Cloud Map Service for ${ServiceName}'
+      DnsConfig:
+        DnsRecords:
+          - Type: !Ref DnsRecordType
+            TTL: !Ref DnsTtl
+        RoutingPolicy: MULTIVALUE
+      HealthCheckCustomConfig:
+        FailureThreshold: !Ref HealthCheckFailureThreshold
+      Tags:
+        - Key: Name
+          Value: !Ref ServiceName
+        - Key: Service
+          Value: !Ref ServiceName
+        - Key: Environment
+          Value: !Ref Env
+
+Outputs:
+  SdServiceId:
+    Description: 'Service Discovery Service ID'
+    Value: !Ref ServiceDiscoveryService
+    Export:
+      Name: !Sub '${AWS::StackName}-${ServiceName}-service-id'
+
+  ServiceArn:
+    Description: 'Service Discovery Service ARN'
+    Value: !GetAtt ServiceDiscoveryService.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-${ServiceName}-service-arn'
+
+  ServiceName:
+    Description: 'Service name'
+    Value: !Ref ServiceName
+    Export:
+      Name: !Sub '${AWS::StackName}-${ServiceName}-service-name'
+
+  DnsName:
+    Description: 'DNS name for service discovery'
+    Value: !Sub
+      - '${ServiceName}.${NamespaceName}'
+      - NamespaceName: !ImportValue
+          Fn::Sub: '${NamespaceStackName}-namespace-name'
+    Export:
+      Name: !Sub '${AWS::StackName}-${ServiceName}-dns-name'
+
