@@ -97,12 +97,6 @@ Resources:
           - Name: APP_ENV
             Type: PLAINTEXT
             Value: !Ref Env
-          - Name: LANE
-            Type: PLAINTEXT
-            Value: "#{variables.LANE}"
-          - Name: BRANCH
-            Type: PLAINTEXT
-            Value: "#{variables.BRANCH}"
       Source:
         Type: CODEPIPELINE
         BuildSpec: !Ref BuildSpec
@@ -128,7 +122,7 @@ Resources:
       Stages:
         - Name: Source
           Actions:
-            - Name: GitHubSource
+            - Name: AppSource
               ActionTypeId:
                 Category: Source
                 Owner: AWS
@@ -141,7 +135,21 @@ Resources:
                 OutputArtifactFormat: CODE_ZIP
                 DetectChanges: false
               OutputArtifacts:
-                - Name: SourceOut
+                - Name: AppOut
+            - Name: InfraSource
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Provider: CodeStarSourceConnection
+                Version: '1'
+              Configuration:
+                ConnectionArn: !Ref ConnectionArn
+                FullRepositoryId: 'nianien/infra-devops'
+                BranchName: 'master'
+                OutputArtifactFormat: CODE_ZIP
+                DetectChanges: false
+              OutputArtifacts:
+                - Name: InfraOut
 
         - Name: Build
           Actions:
@@ -152,11 +160,20 @@ Resources:
                 Provider: CodeBuild
                 Version: '1'
               InputArtifacts:
-                - Name: SourceOut
+                - Name: InfraOut   # 主输入：在这里找 ci/buildspec.yaml
+                - Name: AppOut     # 次输入：业务代码
               OutputArtifacts:
                 - Name: BuildOut
               Configuration:
                 ProjectName: !Ref CodeBuildProject
+                EnvironmentVariables: !Sub |
+                  [
+                    {"name":"LANE","value":"#{variables.LANE}","type":"PLAINTEXT"},
+                    {"name":"BRANCH","value":"#{variables.BRANCH}","type":"PLAINTEXT"},
+                    {"name":"MODULE_PATH","value":"${ModulePath}","type":"PLAINTEXT"},
+                    {"name":"SERVICE_NAME","value":"${ServiceName}","type":"PLAINTEXT"},
+                    {"name":"APP_ENV","value":"${Env}","type":"PLAINTEXT"}
+                  ]
               RunOrder: 1
 
         - Name: DeployService
@@ -168,12 +185,12 @@ Resources:
                 Provider: CloudFormation
                 Version: '1'
               InputArtifacts:
-                - Name: SourceOut
+                - Name: InfraOut
                 - Name: BuildOut
               Configuration:
                 ActionMode: CREATE_UPDATE
                 StackName: !Sub 'app-${ServiceName}-${Env}-#{variables.LANE}'
-                TemplatePath: 'SourceOut::ci/service-stack.yaml'
+                TemplatePath: 'InfraOut::ci/service-stack.yaml'
                 TemplateConfiguration: 'BuildOut::cfn-params.json'
                 RoleArn: !Ref CloudFormationDeployRoleArn
                 Capabilities: 'CAPABILITY_IAM,CAPABILITY_NAMED_IAM'

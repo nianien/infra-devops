@@ -77,7 +77,7 @@ Resources:
       Stages:
         - Name: Source
           Actions:
-            - Name: GitHubSource
+            - Name: InfraSource
               ActionTypeId:
                 Category: Source
                 Owner: AWS
@@ -85,12 +85,12 @@ Resources:
                 Version: '1'
               Configuration:
                 ConnectionArn: !Ref ConnectionArn
-                FullRepositoryId: 'nianien/infra-experimental'
+                FullRepositoryId: 'nianien/infra-devops'
                 BranchName: 'master'
                 OutputArtifactFormat: CODE_ZIP
                 DetectChanges: false
               OutputArtifacts:
-                - Name: SourceOut
+                - Name: InfraOut
 
         - Name: DeployNetwork
           Actions:
@@ -101,11 +101,11 @@ Resources:
                 Provider: CloudFormation
                 Version: '1'
               InputArtifacts:
-                - Name: SourceOut
+                - Name: InfraOut
               Configuration:
                 ActionMode: CREATE_UPDATE
                 StackName: 'network-stack'
-                TemplatePath: 'SourceOut::ci/network-shared-stack.yaml'
+                TemplatePath: 'InfraOut::ci/network-shared-stack.yaml'
                 RoleArn: !Ref CloudFormationDeployRoleArn
                 Capabilities: 'CAPABILITY_IAM,CAPABILITY_NAMED_IAM'
                 ParameterOverrides: !Sub |
@@ -127,11 +127,11 @@ Resources:
                 Provider: CloudFormation
                 Version: '1'
               InputArtifacts:
-                - Name: SourceOut
+                - Name: InfraOut
               Configuration:
                 ActionMode: CREATE_UPDATE
                 StackName: 'sd-namespace-shared'
-                TemplatePath: 'SourceOut::ci/namespace-shared-stack.yaml'
+                TemplatePath: 'InfraOut::ci/namespace-shared-stack.yaml'
                 RoleArn: !Ref CloudFormationDeployRoleArn
                 Capabilities: 'CAPABILITY_IAM,CAPABILITY_NAMED_IAM'
                 ParameterOverrides: !Sub |
@@ -148,11 +148,11 @@ Resources:
                 Provider: CloudFormation
                 Version: '1'
               InputArtifacts:
-                - Name: SourceOut
+                - Name: InfraOut
               Configuration:
                 ActionMode: CREATE_UPDATE
                 StackName: !Sub 'sd-service-shared-${Env}'
-                TemplatePath: 'SourceOut::ci/sd-shared-stack.yaml'
+                TemplatePath: 'InfraOut::ci/sd-shared-stack.yaml'
                 RoleArn: !Ref CloudFormationDeployRoleArn
                 Capabilities: 'CAPABILITY_IAM,CAPABILITY_NAMED_IAM'
                 ParameterOverrides: !Sub |
@@ -171,11 +171,11 @@ Resources:
                 Provider: CloudFormation
                 Version: '1'
               InputArtifacts:
-                - Name: SourceOut
+                - Name: InfraOut
               Configuration:
                 ActionMode: CREATE_UPDATE
                 StackName: !Sub 'log-shared-${Env}'
-                TemplatePath: 'SourceOut::ci/log-shared-stack.yaml'
+                TemplatePath: 'InfraOut::ci/log-shared-stack.yaml'
                 RoleArn: !Ref CloudFormationDeployRoleArn
                 Capabilities: 'CAPABILITY_IAM,CAPABILITY_NAMED_IAM'
                 ParameterOverrides: !Sub |
@@ -193,11 +193,11 @@ Resources:
                 Provider: CloudFormation
                 Version: '1'
               InputArtifacts:
-                - Name: SourceOut
+                - Name: InfraOut
               Configuration:
                 ActionMode: CREATE_UPDATE
                 StackName: !Sub 'alb-shared-${Env}'
-                TemplatePath: 'SourceOut::ci/alb-shared-stack.yaml'
+                TemplatePath: 'InfraOut::ci/alb-shared-stack.yaml'
                 RoleArn: !Ref CloudFormationDeployRoleArn
                 Capabilities: 'CAPABILITY_IAM,CAPABILITY_NAMED_IAM'
                 ParameterOverrides: !Sub |
