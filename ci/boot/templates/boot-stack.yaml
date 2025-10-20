@@ -72,7 +72,7 @@ Resources:
       Name: !Sub '${ServiceName}-${Env}-alb'
       Scheme: internet-facing
       Type: application
-      Subnets: !Split [ ',', !ImportValue !Sub 'infra-environment-${Env}-PublicSubnets' ]
+      Subnets: !Split [ ',', { "Fn::ImportValue": { "Fn::Sub": "infra-environment-${Env}-PublicSubnets" } } ]
       SecurityGroups:
         - !Ref AlbSecurityGroup
 
@@ -194,6 +194,8 @@ Outputs:
     Description: 'DNS name for service discovery'
     Value: !Sub
       - '${ServiceName}.${NamespaceName}'
-      - NamespaceName: !ImportValue !Sub 'infra-environment-${Env}-namespace-name'
+      - NamespaceName:
+          Fn::ImportValue:
+            Fn::Sub: 'infra-environment-${Env}-namespace-name'
     Export:
       Name: !Sub '${AWS::StackName}-${ServiceName}-dns-name'
