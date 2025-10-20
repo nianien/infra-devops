@@ -5,8 +5,8 @@ set -euo pipefail
 # Universal Pipeline Deployment Script
 # =========================================================
 # 统一部署脚本，支持 Infra、Bootstrap、App 三种管道类型
-# 使用方法: ./pipeline-deploy.sh [TYPE] [ENV] [OPTIONS]
-# 示例: ./pipeline-deploy.sh infra dev --dry-run
+# 使用方法: ./pipeline-deploy.sh [TYPE] [FileName] [OPTIONS]
+# 示例: ./pipeline-deploy.sh infra parameters-dev.json --dry-run
 # =========================================================
 
 # 脚本目录
@@ -45,15 +45,15 @@ show_help() {
 Universal Pipeline Deployment Script
 
 USAGE:
-    $0 [TYPE] [ENV] [OPTIONS]
+    $0 [TYPE] [FileName] [OPTIONS]
 
 ARGUMENTS:
     TYPE                Pipeline type (infra|boot|app)
                         - infra: Environment-level shared infrastructure
                         - boot:  Service-level shared infrastructure  
                         - app:   Application deployment
-    ENV                 Environment name (dev|test|preonline|online)
-                        Default: dev
+    FileName            Parameter file name (e.g., parameters-dev.json)
+                        File must exist in the TYPE/parameters/ directory
 
 OPTIONS:
     --dry-run           Show deployment command without executing
@@ -61,18 +61,18 @@ OPTIONS:
     --help, -h          Show this help message
 
 PARAMETERS FILE:
-    The script uses parameters-{ENV}.json file for deployment parameters.
-    Create this file manually in the corresponding directory.
+    The script uses the specified parameter file for deployment parameters.
+    File must exist in the TYPE/parameters/ directory.
 
 EXAMPLES:
-    # Deploy Infrastructure Pipeline to dev
-    $0 infra dev
+    # Deploy Infrastructure Pipeline with parameters-dev.json
+    $0 infra parameters-dev.json
     
-    # Deploy Bootstrap Pipeline to test with dry run
-    $0 boot test --dry-run
+    # Deploy Bootstrap Pipeline with parameters-test.json and dry run
+    $0 boot parameters-test.json --dry-run
     
-    # Deploy Application Pipeline with force
-    $0 app dev --force
+    # Deploy Application Pipeline with parameters-prod.json and force
+    $0 app parameters-prod.json --force
 
 PIPELINE TYPES:
     infra    Deploy environment-level shared infrastructure (VPC, Cloud Map Namespace)
@@ -86,7 +86,7 @@ EOF
 # 参数解析
 # =========================================================
 TYPE="${1:-}"
-ENV="${2:-dev}"
+FILENAME="${2:-}"
 DRY_RUN=false
 FORCE=false
 
@@ -110,6 +110,14 @@ if [[ "$TYPE" != "infra" && "$TYPE" != "boot" && "$TYPE" != "app" ]]; then
     exit 1
 fi
 
+# 验证文件名参数
+if [[ -z "$FILENAME" ]]; then
+    echo "❌ Error: Parameter file name is required"
+    echo "   Example: parameters-dev.json"
+    show_help
+    exit 1
+fi
+
 # 解析命令行参数
 shift 2 2>/dev/null || shift $#  # 移除前两个参数
 while [[ $# -gt 0 ]]; do
@@ -127,14 +135,9 @@ while [[ $# -gt 0 ]]; do
             exit 0
             ;;
         *)
-            if [[ $1 =~ ^[a-zA-Z0-9_-]+$ ]]; then
-                ENV="$1"
-            else
-                echo "❌ Error: Unknown option '$1'"
-                show_help
-                exit 1
-            fi
-            shift
+            echo "❌ Error: Unknown option '$1'"
+            show_help
+            exit 1
             ;;
     esac
 done
@@ -162,11 +165,12 @@ check_environment() {
     fi
     
     # 检查参数文件
-    local parameters_file="$SCRIPT_DIR/$TYPE/parameters/parameters-${ENV}.json"
+    local parameters_file="$SCRIPT_DIR/$TYPE/parameters/$FILENAME"
     if [[ ! -f "$parameters_file" ]]; then
         echo "❌ Error: Parameters file not found: $parameters_file"
         echo "   Please create this file with the required parameters."
-        echo "   You can copy from parameters-dev.json as a template."
+        echo "   Available files in $SCRIPT_DIR/$TYPE/parameters/:"
+        ls -la "$SCRIPT_DIR/$TYPE/parameters/" 2>/dev/null || echo "   (directory not found)"
         exit 1
     fi
     
@@ -257,13 +261,13 @@ deploy_pipeline() {
         app)   echo "🚀 Deploying Application Pipeline..." ;;
     esac
     echo "   Type: $TYPE"
-    echo "   Environment: $ENV"
+    echo "   Parameter file: $FILENAME"
     echo "   Region: $AWS_REGION"
     echo "   Profile: $AWS_PROFILE"
     echo ""
     
     # 参数文件路径
-    local parameters_file="$SCRIPT_DIR/$TYPE/parameters/parameters-${ENV}.json"
+    local parameters_file="$SCRIPT_DIR/$TYPE/parameters/$FILENAME"
     
     # 从参数文件获取栈名
     local pipeline_name=$(jq -r '.[] | select(.ParameterKey=="PipelineName") | .ParameterValue' "$parameters_file")
@@ -273,7 +277,7 @@ deploy_pipeline() {
     fi
     
     # 生成栈名
-    local stack_name="$pipeline_name-$ENV-pipeline"
+    local stack_name="$pipeline_name-pipeline"
     
     # 检查栈状态
     check_stack_status "$stack_name"
@@ -319,12 +323,12 @@ deploy_pipeline() {
         if [[ "$TYPE" == "boot" ]]; then
             echo "   2. Run the pipeline manually with variables:"
             echo "      - Service: your-service-name (e.g., demo-api)"
-            echo "      - Env: $ENV"
+            echo "      - Env: (from parameter file)"
             echo ""
         fi
         case $TYPE in
-            infra) echo "   3. Run Bootstrap Pipeline: ./pipeline-deploy.sh boot $ENV" ;;
-            boot)  echo "   3. Run Application Pipeline: ./pipeline-deploy.sh app $ENV" ;;
+            infra) echo "   3. Run Bootstrap Pipeline: ./pipeline-deploy.sh boot parameters-dev.json" ;;
+            boot)  echo "   3. Run Application Pipeline: ./pipeline-deploy.sh app parameters-dev.json" ;;
             app)   echo "   3. Pipeline deployment completed!" ;;
         esac
         echo ""

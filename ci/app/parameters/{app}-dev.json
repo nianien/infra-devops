@@ -1,0 +1,58 @@
+[
+  {
+    "ParameterKey": "PipelineName",
+    "ParameterValue": "demo-web-api"
+  },
+  {
+    "ParameterKey": "ServiceName",
+    "ParameterValue": "demo-web-api"
+  },
+  {
+    "ParameterKey": "ModulePath",
+    "ParameterValue": "test/demo-web-api"
+  },
+  {
+    "ParameterKey": "AppRepo",
+    "ParameterValue": "nianien/infra-experimental"
+  },
+  {
+    "ParameterKey": "InfraRepo",
+    "ParameterValue": "nianien/infra-devops"
+  },
+  {
+    "ParameterKey": "Env",
+    "ParameterValue": "dev"
+  },
+  {
+    "ParameterKey": "CloudFormationDeployRoleArn",
+    "ParameterValue": "arn:aws:iam::297997107448:role/CloudFormationDeployRole"
+  },
+  {
+    "ParameterKey": "CodePipelineRoleArn",
+    "ParameterValue": "arn:aws:iam::297997107448:role/CodePipelineRole"
+  },
+  {
+    "ParameterKey": "CodeBuildRoleArn",
+    "ParameterValue": "arn:aws:iam::297997107448:role/CodeBuildServiceRole"
+  },
+  {
+    "ParameterKey": "ConnectionArn",
+    "ParameterValue": "arn:aws:codeconnections:ap-southeast-2:297997107448:connection/c1821d00-2845-4f52-a79c-5100c0d5620a"
+  },
+  {
+    "ParameterKey": "ContainerImage",
+    "ParameterValue": "aws/codebuild/standard:7.0"
+  },
+  {
+    "ParameterKey": "BuildSpec",
+    "ParameterValue": "ci/buildspec.yaml"
+  },
+  {
+    "ParameterKey": "DefaultBranch",
+    "ParameterValue": "master"
+  },
+  {
+    "ParameterKey": "DefaultLane",
+    "ParameterValue": "default"
+  }
+]

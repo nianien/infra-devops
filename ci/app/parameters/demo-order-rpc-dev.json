@@ -9,7 +9,7 @@
   },
   {
     "ParameterKey": "ModulePath",
-    "ParameterValue": "test/demo-web-api"
+    "ParameterValue": "test/demo-order-rpc"
   },
   {
     "ParameterKey": "AppRepo",
@@ -21,7 +21,7 @@
   },
   {
     "ParameterKey": "Env",
-    "ParameterValue": "prod"
+    "ParameterValue": "dev"
   },
   {
     "ParameterKey": "CloudFormationDeployRoleArn",
