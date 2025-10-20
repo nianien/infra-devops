@@ -55,7 +55,9 @@ Resources:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: !Sub 'ALB SG for ${ServiceName}'
-      VpcId: !ImportValue !Sub 'infra-environment-${Env}-VpcId'
+      VpcId:
+        Fn::ImportValue:
+          Fn::Sub: 'infra-environment-${Env}-VpcId'
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 80
@@ -80,7 +82,9 @@ Resources:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
       Name: !Sub '${ServiceName}-${Env}-default-tg'
-      VpcId: !ImportValue !Sub 'infra-environment-${Env}-VpcId'
+      VpcId:
+        Fn::ImportValue:
+          Fn::Sub: 'infra-environment-${Env}-VpcId'
       TargetType: ip
       Protocol: HTTP
       Port: !Ref HealthCheckPort
@@ -121,7 +125,9 @@ Resources:
     Type: AWS::ServiceDiscovery::Service
     Properties:
       Name: !Ref ServiceName
-      NamespaceId: !ImportValue !Sub 'infra-environment-${Env}-namespace-id'
+      NamespaceId:
+        Fn::ImportValue:
+          Fn::Sub: 'infra-environment-${Env}-namespace-id'
       Description: !Sub 'Cloud Map Service for ${ServiceName}'
       DnsConfig:
         DnsRecords:
