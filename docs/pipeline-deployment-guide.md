@@ -14,7 +14,7 @@
 ```bash
 # 部署基础设施 Pipeline
 aws cloudformation deploy \
-  --template-file infra/pipeline-infra.yaml \
+  --template-file pipeline/pipeline-infra.yaml \
   --stack-name infra-pipeline-dev \
   --parameter-overrides \
     PipelineName=infra-pipeline-dev \
@@ -38,7 +38,7 @@ aws cloudformation deploy \
 ```bash
 # 部署业务服务 Pipeline
 aws cloudformation deploy \
-  --template-file infra/pipeline-app.yaml \
+  --template-file pipeline/pipeline-app.yaml \
   --stack-name user-service-pipeline-dev \
   --parameter-overrides \
     PipelineName=user-service-pipeline-dev \
