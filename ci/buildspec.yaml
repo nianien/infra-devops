@@ -16,15 +16,15 @@ phases:
 
   pre_build:
     commands:
-      - bash ci/prebuild.sh
+      - . ci/prebuild.sh
 
   build:
     commands:
-      - bash ci/build.sh
+      - . ci/build.sh
 
   post_build:
     commands:
-      - bash ci/postbuild.sh
+      - . ci/postbuild.sh
 
 artifacts:
   files:
