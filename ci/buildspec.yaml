@@ -3,8 +3,8 @@ version: 0.2
 env:
   shell: bash
   variables:
-    MODULE_PATH: "."                  # 相对“应用仓库根”（AppOut）
-    DOCKERFILE_PATH: "ci/Dockerfile"  # 相对“应用仓库根”（AppOut）
+    MODULE_PATH: "."                  # 相对"应用仓库根"（AppOut）
+    DOCKERFILE_PATH: "ci/Dockerfile"  # 相对"应用仓库根"（AppOut）
     SKIP_TESTS: "1"
 
 phases:

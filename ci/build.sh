@@ -23,14 +23,40 @@ else
 fi
 popd >/dev/null
 
-# Docker build & push（加入 --pull 以获取最新基础镜像；可按需移除）
-IMAGE_TAG_URI="$ECR_REPO_URI:$IMAGE_TAG"
-docker build --pull -f "$DF_ABS" -t "$IMAGE_TAG_URI" "$WORK_DIR"
+# 断言 JAR 存在并打印详细信息
+echo "== Checking for JAR files in $WORK_DIR/target =="
+ls -la "$WORK_DIR/target/" 2>/dev/null || echo "target directory not found"
+
+JAR_FILE=$(find "$WORK_DIR/target" -maxdepth 1 -type f -name "*.jar" \
+  ! -name "*-sources.jar" ! -name "*-javadoc.jar" ! -name "*-tests.jar" \
+  | head -n1)
+
+if [[ -z "$JAR_FILE" ]]; then
+  echo "[FATAL] No runnable jar found under $WORK_DIR/target"
+  exit 4
+fi
+
+echo "Found JAR file: $JAR_FILE"
+
+# 提前导出 IMAGE_TAG_URI，给 post_build 用
+export IMAGE_TAG_URI="$ECR_REPO_URI:$IMAGE_TAG"
+
+# Docker build & push - 使用仓库根作为上下文，JAR 路径作为 build-arg
+DF="${DOCKERFILE_PATH:-Dockerfile}"       # 例如 ci/Dockerfile（位于仓库内）
+JAR_ARG="$MODULE_PATH/target/*.jar"       # 关键：相对"仓库根"的路径
+
+echo "Docker build context: $APP_ROOT"
+echo "Dockerfile: $DF"
+echo "JAR_ARG: $JAR_ARG"
+
+docker build \
+  -f "$DF" \
+  --build-arg JAR_FILE="$JAR_ARG" \
+  -t "$IMAGE_TAG_URI" \
+  "$APP_ROOT"
+
 docker push "$IMAGE_TAG_URI"
 
 # 同步 latest（可选）
 docker tag "$IMAGE_TAG_URI" "$ECR_REPO_URI:latest"
 docker push "$ECR_REPO_URI:latest"
-
-# 给 post_build 用
-export IMAGE_TAG_URI
