@@ -46,5 +46,13 @@
   {
     "ParameterKey": "BuildSpec",
     "ParameterValue": "ci/buildspec.yaml"
+  },
+  {
+    "ParameterKey": "DefaultBranch",
+    "ParameterValue": "main"
+  },
+  {
+    "ParameterKey": "DefaultLane",
+    "ParameterValue": "default"
   }
 ]
