@@ -55,7 +55,7 @@ Resources:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: !Sub 'ALB SG for ${ServiceName}'
-      VpcId: !ImportValue 'infra-environment-VpcId'
+      VpcId: !ImportValue !Sub 'infra-environment-${Env}-VpcId'
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 80
@@ -72,7 +72,7 @@ Resources:
       Name: !Sub '${ServiceName}-${Env}-alb'
       Scheme: internet-facing
       Type: application
-      Subnets: !Split [ ',', !ImportValue 'infra-environment-PublicSubnets' ]
+      Subnets: !Split [ ',', !ImportValue !Sub 'infra-environment-${Env}-PublicSubnets' ]
       SecurityGroups:
         - !Ref AlbSecurityGroup
 
@@ -80,7 +80,7 @@ Resources:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
       Name: !Sub '${ServiceName}-${Env}-default-tg'
-      VpcId: !ImportValue 'infra-environment-VpcId'
+      VpcId: !ImportValue !Sub 'infra-environment-${Env}-VpcId'
       TargetType: ip
       Protocol: HTTP
       Port: !Ref HealthCheckPort
@@ -121,7 +121,7 @@ Resources:
     Type: AWS::ServiceDiscovery::Service
     Properties:
       Name: !Ref ServiceName
-      NamespaceId: !ImportValue 'infra-environment-namespace-id'
+      NamespaceId: !ImportValue !Sub 'infra-environment-${Env}-namespace-id'
       Description: !Sub 'Cloud Map Service for ${ServiceName}'
       DnsConfig:
         DnsRecords:
@@ -194,6 +194,6 @@ Outputs:
     Description: 'DNS name for service discovery'
     Value: !Sub
       - '${ServiceName}.${NamespaceName}'
-      - NamespaceName: !ImportValue 'infra-environment-namespace-name'
+      - NamespaceName: !ImportValue !Sub 'infra-environment-${Env}-namespace-name'
     Export:
       Name: !Sub '${AWS::StackName}-${ServiceName}-dns-name'

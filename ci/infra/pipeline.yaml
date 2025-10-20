@@ -106,7 +106,7 @@ Resources:
                 - Name: InfraOut
               Configuration:
                 ActionMode: CREATE_UPDATE
-                StackName: 'infra-environment'
+                StackName: !Sub 'infra-environment-${Env}'
                 TemplatePath: 'InfraOut::ci/infra/templates/infra-stack.yaml'
                 RoleArn: !Ref CloudFormationDeployRoleArn
                 Capabilities: 'CAPABILITY_IAM,CAPABILITY_NAMED_IAM'

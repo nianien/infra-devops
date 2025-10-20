@@ -63,7 +63,7 @@ Resources:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
       Name: !Sub '${ServiceName}-${Env}-${Lane}-tg'
-      VpcId: !ImportValue infra-environment-VpcId
+      VpcId: !ImportValue !Sub 'infra-environment-${Env}-VpcId'
       TargetType: ip
       Protocol: HTTP
       Port: !Ref WebServerPort
@@ -148,9 +148,7 @@ Resources:
         - LaneAsDefault
         - !Sub '${ServiceName}-${Env}-default'
         - !Sub '${ServiceName}-${Env}-${Lane}'
-      Cluster:
-        Fn::ImportValue:
-          Fn::Sub: 'infra-environment-ClusterName'
+      Cluster: !ImportValue !Sub 'infra-environment-${Env}-ClusterName'
       LaunchType: FARGATE
       DesiredCount: !Ref DesiredCount
       TaskDefinition: !Ref TaskDef
@@ -162,7 +160,7 @@ Resources:
         MinimumHealthyPercent: 100
       NetworkConfiguration:
         AwsvpcConfiguration:
-          Subnets: !Split [ ",", { "Fn::ImportValue": "infra-environment-PrivateSubnets" } ]
+          Subnets: !Split [ ",", !ImportValue !Sub 'infra-environment-${Env}-PrivateSubnets' ]
           AssignPublicIp: ENABLED
       ServiceRegistries:
         - RegistryArn:
