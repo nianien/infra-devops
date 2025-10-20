@@ -75,7 +75,7 @@ Resources:
 
   LaneListenerRule:
     Type: AWS::ElasticLoadBalancingV2::ListenerRule
-    Condition: !Not [ !Condition LaneAsDefault ]
+    Condition: !Not [ LaneAsDefault ]
     Properties:
       ListenerArn: !ImportValue 'boot-alb-${ServiceName}-${Env}-HttpListenerArn'
       Priority: 100

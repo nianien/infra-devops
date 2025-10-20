@@ -7,8 +7,14 @@ Parameters:
   # =========================================================
   PipelineName:
     Type: String
-    Default: 'service-bootstrap'
+    Default: 'bootstrap-service'
     Description: 'Service Bootstrap Pipeline name'
+
+  Env:
+    Type: String
+    Default: 'dev'
+    AllowedValues: [ dev, test, preonline, online ]
+    Description: 'Environment name'
 
 
   # =========================================================
@@ -37,11 +43,17 @@ Parameters:
     Default: 'nianien/infra-devops'
     Description: 'GitHub repository ID (format: owner/repository)'
 
+  RestartExecutionOnUpdate:
+    Type: String
+    Default: 'false'
+    AllowedValues: [ 'true', 'false' ]
+    Description: 'Whether to restart pipeline execution on update'
+
 Resources:
   Pipeline:
     Type: AWS::CodePipeline::Pipeline
     Properties:
-      Name: !Ref PipelineName
+      Name: !Sub '${PipelineName}-${Env}'
       RoleArn: !Ref CodePipelineRoleArn
       ArtifactStore:
         Type: S3
@@ -49,11 +61,8 @@ Resources:
 
       Variables:
         - Name: Service
-          DefaultValue: ''
+          DefaultValue: 'demo-service'
           Description: 'ECS service name (e.g. demo-rpc or demo-api). Use lowercase letters, numbers, and hyphens only.'
-        - Name: Env
-          DefaultValue: 'dev'
-          Description: 'Environment name'
 
       Stages:
         - Name: Source
@@ -85,14 +94,14 @@ Resources:
                 - Name: InfraOut
               Configuration:
                 ActionMode: CREATE_UPDATE
-                StackName: !Sub 'boot-sd-#{variables.Service}-#{variables.Env}'
+                StackName: !Sub 'boot-sd-#{variables.Service}-${Env}'
                 TemplatePath: 'InfraOut::ci/boot/templates/sd-stack.yaml'
                 RoleArn: !Ref CloudFormationDeployRoleArn
                 Capabilities: 'CAPABILITY_IAM,CAPABILITY_NAMED_IAM'
                 ParameterOverrides: !Sub |
                   {
                     "ServiceName": "#{variables.Service}",
-                    "Env": "#{variables.Env}",
+                    "Env": "${Env}",
                     "NamespaceStackName": "infra-namespace"
                   }
 
@@ -108,14 +117,14 @@ Resources:
                 - Name: InfraOut
               Configuration:
                 ActionMode: CREATE_UPDATE
-                StackName: !Sub 'boot-log-#{variables.Service}-#{variables.Env}'
+                StackName: !Sub 'boot-log-#{variables.Service}-${Env}'
                 TemplatePath: 'InfraOut::ci/boot/templates/log-stack.yaml'
                 RoleArn: !Ref CloudFormationDeployRoleArn
                 Capabilities: 'CAPABILITY_IAM,CAPABILITY_NAMED_IAM'
                 ParameterOverrides: !Sub |
                   {
                     "ServiceName": "#{variables.Service}",
-                    "Env": "#{variables.Env}"
+                    "Env": "${Env}"
                   }
 
         - Name: DeployAlb
@@ -130,17 +139,26 @@ Resources:
                 - Name: InfraOut
               Configuration:
                 ActionMode: CREATE_UPDATE
-                StackName: !Sub 'boot-alb-#{variables.Service}-#{variables.Env}'
+                StackName: !Sub 'boot-alb-#{variables.Service}-${Env}'
                 TemplatePath: 'InfraOut::ci/boot/templates/alb-stack.yaml'
                 RoleArn: !Ref CloudFormationDeployRoleArn
                 Capabilities: 'CAPABILITY_IAM,CAPABILITY_NAMED_IAM'
                 ParameterOverrides: !Sub |
                   {
                     "ServiceName": "#{variables.Service}",
-                    "Env": "#{variables.Env}"
+                    "Env": "${Env}"
                   }
 
-      RestartExecutionOnUpdate: true
+      RestartExecutionOnUpdate: !Ref RestartExecutionOnUpdate
+      
+      # 禁用所有阶段的自动转换，防止创建时自动触发
+      DisableInboundStageTransitions:
+        - StageName: DeployServiceDiscovery
+          Reason: "Disable automatic transitions on pipeline creation"
+        - StageName: DeployLog
+          Reason: "Disable automatic transitions on pipeline creation"
+        - StageName: DeployAlb
+          Reason: "Disable automatic transitions on pipeline creation"
 
 Outputs:
   PipelineNameOut:

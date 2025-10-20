@@ -1,7 +1,11 @@
 [
   {
     "ParameterKey": "PipelineName",
-    "ParameterValue": "boot-init"
+    "ParameterValue": "bootstrap-service"
+  },
+  {
+    "ParameterKey": "Env",
+    "ParameterValue": "dev"
   },
   {
     "ParameterKey": "CloudFormationDeployRoleArn",
@@ -22,6 +26,10 @@
   {
     "ParameterKey": "FullRepositoryId",
     "ParameterValue": "nianien/infra-devops"
+  },
+  {
+    "ParameterKey": "RestartExecutionOnUpdate",
+    "ParameterValue": "false"
   }
 ]
 

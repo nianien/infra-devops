@@ -20,39 +20,21 @@ else
     exit 1
 fi
 
+
 # =========================================================
-# 管道类型配置
+# 自动发现模板文件
 # =========================================================
-get_pipeline_config() {
+discover_templates() {
     local type="$1"
-    local key="$2"
+    local templates_dir="$SCRIPT_DIR/$type/templates"
     
-    case "$type" in
-        infra)
-            case "$key" in
-                title) echo "Infrastructure Pipeline" ;;
-                description) echo "Environment-level shared infrastructure (VPC, Cloud Map Namespace)" ;;
-                templates) echo "vpc-stack.yaml namespace-stack.yaml" ;;
-                next_step) echo "Run Bootstrap Pipeline: ./pipeline-deploy.sh boot $ENV" ;;
-            esac
-            ;;
-        boot)
-            case "$key" in
-                title) echo "Service Bootstrap Pipeline" ;;
-                description) echo "Service-level shared infrastructure (Cloud Map Service, LogGroup, ALB)" ;;
-                templates) echo "sd-stack.yaml log-stack.yaml alb-stack.yaml" ;;
-                next_step) echo "Run Application Pipeline: ./pipeline-deploy.sh app $ENV" ;;
-            esac
-            ;;
-        app)
-            case "$key" in
-                title) echo "Application Pipeline" ;;
-                description) echo "Application deployment (Task Definition, ECS Service, Target Group, Listener Rule)" ;;
-                templates) echo "service-stack.yaml" ;;
-                next_step) echo "Pipeline deployment completed!" ;;
-            esac
-            ;;
-    esac
+    if [[ ! -d "$templates_dir" ]]; then
+        echo "❌ Error: Templates directory not found: $templates_dir"
+        exit 1
+    fi
+    
+    # 查找所有 .yaml 文件，排除 pipeline.yaml
+    find "$templates_dir" -name "*.yaml" -not -name "pipeline.yaml" -exec basename {} \; | sort
 }
 
 # =========================================================
@@ -121,7 +103,7 @@ if [[ -z "$TYPE" ]]; then
     exit 1
 fi
 
-if [[ -z "$(get_pipeline_config "$TYPE" "title")" ]]; then
+if [[ "$TYPE" != "infra" && "$TYPE" != "boot" && "$TYPE" != "app" ]]; then
     echo "❌ Error: Invalid pipeline type '$TYPE'"
     echo "   Valid types: infra, boot, app"
     show_help
@@ -221,11 +203,13 @@ validate_templates() {
     fi
     echo "   ✅ Main template validation passed"
     
-    # 校验相关模板
-    local templates="$(get_pipeline_config "$TYPE" "templates")"
-    for template in $templates; do
-        local template_path="$SCRIPT_DIR/$TYPE/templates/$template"
-        if [[ -f "$template_path" ]]; then
+    # 自动发现并校验相关模板
+    local templates=$(discover_templates "$TYPE")
+    if [[ -z "$templates" ]]; then
+        echo "   ⚠️  No CloudFormation templates found in $SCRIPT_DIR/$TYPE/templates/"
+    else
+        for template in $templates; do
+            local template_path="$SCRIPT_DIR/$TYPE/templates/$template"
             echo "   Validating template: $template"
             if ! aws cloudformation validate-template \
                 --template-body "file://$template_path" \
@@ -236,10 +220,8 @@ validate_templates() {
                 exit 1
             fi
             echo "   ✅ Template validation passed: $template"
-        else
-            echo "   ⚠️  Template not found: $template_path"
-        fi
-    done
+        done
+    fi
     
     echo "✅ All template validations passed"
 }
@@ -269,7 +251,11 @@ check_stack_status() {
 # 执行部署
 # =========================================================
 deploy_pipeline() {
-    echo "🚀 Deploying $(get_pipeline_config "$TYPE" "title")..."
+    case $TYPE in
+        infra) echo "🚀 Deploying Infrastructure Pipeline..." ;;
+        boot)  echo "🚀 Deploying Service Bootstrap Pipeline..." ;;
+        app)   echo "🚀 Deploying Application Pipeline..." ;;
+    esac
     echo "   Type: $TYPE"
     echo "   Environment: $ENV"
     echo "   Region: $AWS_REGION"
@@ -287,18 +273,7 @@ deploy_pipeline() {
     fi
     
     # 生成栈名
-    local stack_name
-    case $TYPE in
-        infra)
-            stack_name="$pipeline_name-$ENV-pipeline"
-            ;;
-        boot)
-            stack_name="boot-pipeline-${ENV}"
-            ;;
-        app)
-            stack_name="app-pipeline-${ENV}"
-            ;;
-    esac
+    local stack_name="$pipeline_name-$ENV-pipeline"
     
     # 检查栈状态
     check_stack_status "$stack_name"
@@ -331,7 +306,11 @@ deploy_pipeline() {
     
     if eval "$deploy_cmd"; then
         echo ""
-        echo "✅ $(get_pipeline_config "$TYPE" "title") deployed successfully!"
+        case $TYPE in
+            infra) echo "✅ Infrastructure Pipeline deployed successfully!" ;;
+            boot)  echo "✅ Service Bootstrap Pipeline deployed successfully!" ;;
+            app)   echo "✅ Application Pipeline deployed successfully!" ;;
+        esac
         echo ""
         echo "📋 Next steps:"
         echo "   1. Check the pipeline in AWS Console:"
@@ -343,7 +322,11 @@ deploy_pipeline() {
             echo "      - Env: $ENV"
             echo ""
         fi
-        echo "   3. $(get_pipeline_config "$TYPE" "next_step")"
+        case $TYPE in
+            infra) echo "   3. Run Bootstrap Pipeline: ./pipeline-deploy.sh boot $ENV" ;;
+            boot)  echo "   3. Run Application Pipeline: ./pipeline-deploy.sh app $ENV" ;;
+            app)   echo "   3. Pipeline deployment completed!" ;;
+        esac
         echo ""
     else
         echo ""
@@ -358,9 +341,23 @@ deploy_pipeline() {
 # 主函数
 # =========================================================
 main() {
-    echo "🏗️  $(get_pipeline_config "$TYPE" "title") Deployment"
-    echo "========================================"
-    echo "📝 $(get_pipeline_config "$TYPE" "description")"
+    case $TYPE in
+        infra)
+            echo "🏗️  Infrastructure Pipeline Deployment"
+            echo "========================================"
+            echo "📝 Environment-level shared infrastructure (VPC, Cloud Map Namespace)"
+            ;;
+        boot)
+            echo "🔧 Service Bootstrap Pipeline Deployment"
+            echo "========================================"
+            echo "📝 Service-level shared infrastructure (Cloud Map Service, LogGroup, ALB)"
+            ;;
+        app)
+            echo "🚀 Application Pipeline Deployment"
+            echo "========================================"
+            echo "📝 Application deployment (Task Definition, ECS Service, Target Group, Listener Rule)"
+            ;;
+    esac
     echo ""
     
     check_environment
