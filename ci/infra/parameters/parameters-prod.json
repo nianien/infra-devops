@@ -17,11 +17,7 @@
   },
   {
     "ParameterKey": "ConnectionArn",
-    "ParameterValue": "arn:aws:codeconnections:us-east-1:297997107448:connection/9adfd918-2843-4147-9bc9-c4ee1a99bc39"
-  },
-  {
-    "ParameterKey": "ArtifactBucketName",
-    "ParameterValue": "codepipeline-us-east-1-prod-bucket"
+    "ParameterValue": "arn:aws:codeconnections:ap-southeast-2:297997107448:connection/c1821d00-2845-4f52-a79c-5100c0d5620a"
   },
   {
     "ParameterKey": "VpcCidr",

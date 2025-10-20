@@ -1,7 +1,23 @@
 [
   {
     "ParameterKey": "PipelineName",
-    "ParameterValue": "app-init"
+    "ParameterValue": "demo-web-api"
+  },
+  {
+    "ParameterKey": "ServiceName",
+    "ParameterValue": "demo-web-api"
+  },
+  {
+    "ParameterKey": "AppRepo",
+    "ParameterValue": "nianien/infra-experimental"
+  },
+  {
+    "ParameterKey": "InfraRepo",
+    "ParameterValue": "nianien/infra-devops"
+  },
+  {
+    "ParameterKey": "Env",
+    "ParameterValue": "dev"
   },
   {
     "ParameterKey": "CloudFormationDeployRoleArn",
@@ -12,19 +28,23 @@
     "ParameterValue": "arn:aws:iam::297997107448:role/CodePipelineRole"
   },
   {
+    "ParameterKey": "CodeBuildRoleArn",
+    "ParameterValue": "arn:aws:iam::297997107448:role/CodeBuildServiceRole"
+  },
+  {
     "ParameterKey": "ConnectionArn",
-    "ParameterValue": "arn:aws:codeconnections:us-east-1:297997107448:connection/9adfd918-2843-4147-9bc9-c4ee1a99bc39"
+    "ParameterValue": "arn:aws:codeconnections:ap-southeast-2:297997107448:connection/c1821d00-2845-4f52-a79c-5100c0d5620a"
   },
   {
-    "ParameterKey": "ArtifactBucketName",
-    "ParameterValue": "codepipeline-us-east-1-3622cd43956e-4d23-9284-a18746ff6c07"
+    "ParameterKey": "ContainerImage",
+    "ParameterValue": "aws/codebuild/standard:7.0"
   },
   {
-    "ParameterKey": "FullRepositoryId",
-    "ParameterValue": "nianien/infra-devops"
+    "ParameterKey": "ModulePath",
+    "ParameterValue": "."
   },
   {
-    "ParameterKey": "AppRepositoryId",
-    "ParameterValue": "nianien/demo-app"
+    "ParameterKey": "BuildSpec",
+    "ParameterValue": "ci/buildspec.yaml"
   }
 ]

@@ -22,13 +22,7 @@ Parameters:
   # =========================================================
   ConnectionArn:
     Type: String
-    Default: 'arn:aws:codeconnections:us-east-1:297997107448:connection/9adfd918-2843-4147-9bc9-c4ee1a99bc39'
     Description: 'CodeStar connection ARN (GitHub integration)'
-
-  ArtifactBucketName:
-    Type: String
-    Default: 'codepipeline-us-east-1-3622cd43956e-4d23-9284-a18746ff6c07'
-    Description: 'S3 artifact bucket for CodePipeline artifacts'
 
   CloudFormationDeployRoleArn:
     Type: String
@@ -50,6 +44,12 @@ Parameters:
     Description: 'Whether to restart pipeline execution on update'
 
 Resources:
+  PipelineArtifactBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      # BucketName: !Sub 'ci-${PipelineName}-${Env}-artifacts'
+      VersioningConfiguration:
+        Status: Enabled
   Pipeline:
     Type: AWS::CodePipeline::Pipeline
     Properties:
@@ -57,7 +57,7 @@ Resources:
       RoleArn: !Ref CodePipelineRoleArn
       ArtifactStore:
         Type: S3
-        Location: !Ref ArtifactBucketName
+        Location: !Ref PipelineArtifactBucket
 
       Variables:
         - Name: Service

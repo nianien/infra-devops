@@ -7,8 +7,6 @@ Parameters:
     Description: 'Environment name (e.g. dev, prod)'
     Default: 'dev'
 
-
-
 Resources:
   PrivateDnsNamespace:
     Type: AWS::ServiceDiscovery::PrivateDnsNamespace

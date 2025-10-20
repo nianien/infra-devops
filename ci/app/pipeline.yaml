@@ -13,9 +13,13 @@ Parameters:
     Type: String
     Description: 'ECS service name (e.g. demo-rpc or demo-api)'
 
-  RepoName:
+  AppRepo:
     Type: String
-    Description: 'GitHub repository (format: <org>/<repo>)'
+    Description: 'Application repository (format: <org>/<repo>)'
+
+  InfraRepo:
+    Type: String
+    Description: 'Infra templates repository (format: <org>/<repo>)'
 
   Env:
     Type: String
@@ -43,13 +47,7 @@ Parameters:
 
   ConnectionArn:
     Type: String
-    Default: 'arn:aws:codeconnections:us-east-1:297997107448:connection/9adfd918-2843-4147-9bc9-c4ee1a99bc39'
     Description: 'CodeStar connection ARN (GitHub integration)'
-
-  ArtifactBucketName:
-    Type: String
-    Default: 'codepipeline-us-east-1-3622cd43956e-4d23-9284-a18746ff6c07'
-    Description: 'S3 artifact bucket for CodePipeline artifacts'
 
   BuildSpec:
     Type: String
@@ -102,6 +100,12 @@ Resources:
         BuildSpec: !Ref BuildSpec
       TimeoutInMinutes: 60
 
+  PipelineArtifactBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      # BucketName: !Sub 'ci-${PipelineName}-${Env}-artifacts'
+      VersioningConfiguration:
+        Status: Enabled
   Pipeline:
     Type: AWS::CodePipeline::Pipeline
     Properties:
@@ -109,7 +113,7 @@ Resources:
       RoleArn: !Ref CodePipelineRoleArn
       ArtifactStore:
         Type: S3
-        Location: !Ref ArtifactBucketName
+        Location: !Ref PipelineArtifactBucket
 
       Variables:
         - Name: LANE
@@ -130,7 +134,7 @@ Resources:
                 Version: '1'
               Configuration:
                 ConnectionArn: !Ref ConnectionArn
-                FullRepositoryId: !Ref RepoName
+                FullRepositoryId: !Ref AppRepo
                 BranchName: "#{variables.BRANCH}"
                 OutputArtifactFormat: CODE_ZIP
                 DetectChanges: false
@@ -144,8 +148,8 @@ Resources:
                 Version: '1'
               Configuration:
                 ConnectionArn: !Ref ConnectionArn
-                FullRepositoryId: 'nianien/infra-devops'
-                BranchName: 'master'
+                FullRepositoryId: !Ref InfraRepo
+                BranchName: 'main'
                 OutputArtifactFormat: CODE_ZIP
                 DetectChanges: false
               OutputArtifacts:
@@ -160,8 +164,8 @@ Resources:
                 Provider: CodeBuild
                 Version: '1'
               InputArtifacts:
-                - Name: InfraOut   # 主输入：在这里找 ci/buildspec.yaml
-                - Name: AppOut     # 次输入：业务代码
+                - Name: InfraOut   # ci/buildspec.yaml must be in first repo
+                - Name: AppOut
               OutputArtifacts:
                 - Name: BuildOut
               Configuration:
