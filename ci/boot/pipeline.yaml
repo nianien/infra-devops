@@ -47,7 +47,7 @@ Resources:
   PipelineArtifactBucket:
     Type: AWS::S3::Bucket
     Properties:
-      # BucketName: !Sub 'ci-${PipelineName}-${Env}-artifacts'
+      # BucketName: ${pipeline_stack_name}_pipelineartifactbucket-xxxx
       VersioningConfiguration:
         Status: Enabled
   Pipeline:
