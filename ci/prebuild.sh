@@ -37,19 +37,11 @@ echo "APP_ENV=${APP_ENV}"
 echo "LANE=${LANE}"
 echo "BRANCH=${BRANCH}"
 
-# --- 切分支（在 AppOut 仓库） ---
+# --- 检查 AppOut 仓库状态 ---
 pushd "$APP_ROOT" >/dev/null
-# 确保工作区干净，避免切分支失败
-git reset --hard >/dev/null 2>&1 || true
-git clean -fdx >/dev/null 2>&1 || true
 CURRENT_BRANCH="$(git rev-parse --abbrev-ref HEAD || echo '')"
 echo "== Current branch: ${CURRENT_BRANCH}"
-if [[ "$CURRENT_BRANCH" != "$BRANCH" ]]; then
-  echo "== Switching branch to ${BRANCH} =="
-  retry 3 git fetch --no-tags origin "$BRANCH" --depth=1 || { echo "[FATAL] Branch ${BRANCH} not found on origin"; exit 1; }
-  git checkout -B "$BRANCH" "origin/$BRANCH"
-fi
-# 用切换后的 HEAD 生成短提交号
+# 用当前 HEAD 生成短提交号
 COMMIT7="$(git rev-parse --short=7 HEAD || true)"
 git log -1 --oneline || true
 popd >/dev/null

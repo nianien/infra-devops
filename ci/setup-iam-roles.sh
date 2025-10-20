@@ -18,40 +18,17 @@ set -euo pipefail
 # ===== 角色名 =====
 CFN_ROLE_NAME="${CFN_ROLE_NAME:-CloudFormationDeployRole}"
 CP_ROLE_NAME="${CP_ROLE_NAME:-CodePipelineRole}"
-CB_ROLE_NAME="${CB_ROLE_NAME:-CodeBuildRole}"
+CB_ROLE_NAME="${CB_ROLE_NAME:-CodeBuildServiceRole}"
 
 # ===== S3 作用域 =====
-# 内置常见模式；并可通过 ARTIFACT_BUCKETS 精确追加
-S3_BUCKET_PATTERNS=(
-  "*-pipeline-pipelineartifactbucket-*"
-  "*-pipelineartifactbucket-*"
-  "codepipeline-*"
-)
-
-IFS=',' read -r -a EXTRA_BUCKETS <<< "${ARTIFACT_BUCKETS:-}"
-for b in "${EXTRA_BUCKETS[@]:-}"; do
-  b="${b// }"  # 去除空格
-  [[ -n "$b" ]] && S3_BUCKET_PATTERNS+=("$b")
-done
-
-# 生成 Resource ARN 列表
-S3_ARN_BUCKETS=()
-S3_ARN_OBJECTS=()
-for pat in "${S3_BUCKET_PATTERNS[@]}"; do
-  S3_ARN_BUCKETS+=( "arn:aws:s3:::${pat}" )
-  S3_ARN_OBJECTS+=( "arn:aws:s3:::${pat}/*" )
-done
+# 使用通配符覆盖所有 pipelineartifactbucket 桶
+S3_ARTIFACT_BUCKET_PATTERN="*pipelineartifactbucket*"
 
 # ===== 账号信息 =====
 ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text --profile "$AWS_PROFILE")"
 REGION="$(aws configure get region --profile "$AWS_PROFILE" || echo "us-east-1")"
 echo "==> profile=$AWS_PROFILE account=$ACCOUNT_ID region=$REGION"
-echo "==> artifact buckets scope:"
-if [[ ${#S3_ARN_BUCKETS[@]} -gt 0 ]]; then
-  printf '    - %s\n' "${S3_ARN_BUCKETS[@]}"
-else
-  echo "    (no buckets configured)"
-fi
+echo "==> artifact buckets scope: $S3_ARTIFACT_BUCKET_PATTERN"
 
 # ===== 工具函数 =====
 tmp() { mktemp -t iamjson.XXXXXX; }
@@ -113,19 +90,6 @@ else
   create_with_trust "$CP_ROLE_NAME" "$CP_TRUST_JSON"
 fi
 
-# 拼接 S3 资源数组到 JSON
-to_json_array() {
-  local arr_name="$1"
-  local arr_ref="${arr_name}[@]"
-  local arr=("${!arr_ref}")
-  if [[ ${#arr[@]} -eq 0 ]]; then
-    echo '[]'
-  else
-    printf '[%s]\n' "$(printf '"%s",' "${arr[@]}" | sed 's/,$//')"
-  fi
-}
-CP_S3_BUCKETS_JSON="$(to_json_array S3_ARN_BUCKETS)"
-CP_S3_OBJECTS_JSON="$(to_json_array S3_ARN_OBJECTS)"
 
 CP_INLINE_JSON=$(json_file <<JSON
 {
@@ -136,26 +100,6 @@ CP_INLINE_JSON=$(json_file <<JSON
       "Effect": "Allow",
       "Action": ["codebuild:StartBuild","codebuild:BatchGetBuilds"],
       "Resource": "*"
-    },
-    {
-      "Sid": "ArtifactsReadWrite",
-      "Effect": "Allow",
-      "Action": [
-        "s3:GetBucketLocation",
-        "s3:ListBucket",
-        "s3:ListBucketMultipartUploads"
-      ],
-      "Resource": ${CP_S3_BUCKETS_JSON}
-    },
-    {
-      "Sid": "ArtifactsObjectsRW",
-      "Effect": "Allow",
-      "Action": [
-        "s3:GetObject","s3:GetObjectVersion",
-        "s3:PutObject","s3:PutObjectAcl",
-        "s3:AbortMultipartUpload"
-      ],
-      "Resource": ${CP_S3_OBJECTS_JSON}
     },
     {
       "Sid": "PassRoles",
@@ -182,8 +126,8 @@ CP_S3_EXTRA_JSON=$(json_file <<JSON
       "Effect": "Allow",
       "Action": "s3:*",
       "Resource": [
-        "arn:aws:s3:::*pipelineartifactbucket*",
-        "arn:aws:s3:::*pipelineartifactbucket*/*"
+        "arn:aws:s3:::${S3_ARTIFACT_BUCKET_PATTERN}",
+        "arn:aws:s3:::${S3_ARTIFACT_BUCKET_PATTERN}/*"
       ]
     }
   ]
@@ -215,8 +159,6 @@ else
   create_with_trust "$CB_ROLE_NAME" "$CB_TRUST_JSON"
 fi
 
-CB_S3_BUCKETS_JSON="$(to_json_array S3_ARN_BUCKETS)"
-CB_S3_OBJECTS_JSON="$(to_json_array S3_ARN_OBJECTS)"
 
 CB_INLINE_JSON=$(json_file <<JSON
 {
@@ -242,26 +184,6 @@ CB_INLINE_JSON=$(json_file <<JSON
         "ecr:CompleteLayerUpload"
       ],
       "Resource": "*"
-    },
-    {
-      "Sid": "S3ArtifactsBucketMeta",
-      "Effect": "Allow",
-      "Action": [
-        "s3:GetBucketLocation",
-        "s3:ListBucket",
-        "s3:ListBucketMultipartUploads"
-      ],
-      "Resource": ${CB_S3_BUCKETS_JSON}
-    },
-    {
-      "Sid": "S3ArtifactsObjectsRW",
-      "Effect": "Allow",
-      "Action": [
-        "s3:GetObject","s3:GetObjectVersion",
-        "s3:PutObject","s3:PutObjectAcl",
-        "s3:AbortMultipartUpload"
-      ],
-      "Resource": ${CB_S3_OBJECTS_JSON}
     }
   ]
 }
@@ -279,8 +201,8 @@ CB_S3_EXTRA_JSON=$(json_file <<JSON
       "Effect": "Allow",
       "Action": "s3:*",
       "Resource": [
-        "arn:aws:s3:::*pipelineartifactbucket*",
-        "arn:aws:s3:::*pipelineartifactbucket*/*"
+        "arn:aws:s3:::${S3_ARTIFACT_BUCKET_PATTERN}",
+        "arn:aws:s3:::${S3_ARTIFACT_BUCKET_PATTERN}/*"
       ]
     }
   ]
