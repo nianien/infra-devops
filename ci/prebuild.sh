@@ -1,78 +1,88 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# 简单重试封装（指数退避）
-retry() {
-  local attempts="${1:-3}"; shift || true
-  local delay=1
-  local n=1
-  while true; do
-    if "$@"; then
-      return 0
-    fi
-    if (( n >= attempts )); then
-      echo "[FATAL] command failed after ${attempts} attempts: $*" >&2
-      return 1
-    fi
-    sleep "$delay"
-    delay=$(( delay * 2 ))
-    n=$(( n + 1 ))
-  done
-}
-
-# InfraOut 为主输入 → $CODEBUILD_SRC_DIR
-# AppOut  为次输入 → $CODEBUILD_SRC_DIR_AppOut（需 CODEBUILD_CLONE_REF）
-INFRA_ROOT="${CODEBUILD_SRC_DIR:-.}"
-APP_ROOT="${CODEBUILD_SRC_DIR_AppOut:-$INFRA_ROOT}"
-CI_ENV_FILE="/tmp/ci_env_${CODEBUILD_BUILD_ID:-default}"
-
 echo "== Environment variables check =="
-: "${SERVICE_NAME:?[FATAL] Missing SERVICE_NAME}"
-: "${APP_ENV:?[FATAL] Missing APP_ENV}"
-: "${LANE:?[FATAL] Missing LANE}"
-: "${BRANCH:?[FATAL] Missing BRANCH}"
 echo "MODULE_PATH=${MODULE_PATH:-.}"
-echo "SERVICE_NAME=${SERVICE_NAME}"
-echo "APP_ENV=${APP_ENV}"
-echo "LANE=${LANE}"
-echo "BRANCH=${BRANCH}"
+echo "SERVICE_NAME=${SERVICE_NAME:-}"
+echo "APP_ENV=${APP_ENV:-}"
+echo "LANE=${LANE:-}"
+echo "BRANCH=${BRANCH:-}"
 
-# --- 检查 AppOut 仓库状态 ---
-pushd "$APP_ROOT" >/dev/null
-CURRENT_BRANCH="$(git rev-parse --abbrev-ref HEAD || echo '')"
-echo "== Current branch: ${CURRENT_BRANCH}"
-# 用当前 HEAD 生成短提交号
-COMMIT7="$(git rev-parse --short=7 HEAD || true)"
-git log -1 --oneline || true
-popd >/dev/null
+# --- 目录就绪性 ---
+SRC_DIR="${CODEBUILD_SRC_DIR:-}"
+APP_OUT_DIR_VAR="CODEBUILD_SRC_DIR_AppOut"
+APP_OUT_DIR="${!APP_OUT_DIR_VAR:-}"
 
-# --- 计算 ECR REPO & 登录 ---
-ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
-AWS_REGION="${AWS_REGION:-${AWS_DEFAULT_REGION:-}}"
-ECR_REPO_URI="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${SERVICE_NAME}"
-export ECR_REPO_URI
-# --- 生成镜像 TAG（时间戳.提交号） ---
-TIMESTAMP="$(date +%Y%m%d%H%M%S)"
-IMAGE_TAG="${TIMESTAMP}.${COMMIT7:-latest}"
-export IMAGE_TAG
-
-echo "== Ensure ECR repo & login =="
-if ! aws ecr describe-repositories --repository-names "${SERVICE_NAME}" --region "$AWS_REGION" >/dev/null 2>&1; then
-  retry 3 aws ecr create-repository --repository-name "${SERVICE_NAME}" --region "$AWS_REGION" >/dev/null
+if [[ -z "$SRC_DIR" || ! -d "$SRC_DIR" ]]; then
+  echo "[FATAL] Primary source dir not found: CODEBUILD_SRC_DIR='${SRC_DIR:-<empty>}'"
+  exit 1
 fi
 
-# ECR 登录函数（避免引号地狱）
-ecr_login() {
-  aws ecr get-login-password --region "$AWS_REGION" \
-  | docker login --username AWS --password-stdin "${ECR_REPO_URI%%/*}"
-}
-retry 3 ecr_login
+if [[ -z "$APP_OUT_DIR" || ! -d "$APP_OUT_DIR" ]]; then
+  echo "[FATAL] AppOut directory not found. ${APP_OUT_DIR_VAR}='${APP_OUT_DIR:-<empty>}'"
+  exit 1
+fi
+
+echo "== Sources =="
+echo "Primary: ${SRC_DIR}"
+echo "AppOut : ${APP_OUT_DIR}"
+
+# --- 解析提交信息（本地只读，不触网） ---
+echo "Resolved primary version: ${CODEBUILD_RESOLVED_SOURCE_VERSION:-<n/a>}"
+echo "Resolved AppOut version : ${CODEBUILD_RESOLVED_SOURCE_VERSION_AppOut:-<n/a>}"
+
+COMMIT7="$(cd "${APP_OUT_DIR}" && git rev-parse --short=7 HEAD 2>/dev/null || echo 'latest')"
+echo "== AppOut commit: ${COMMIT7}"
+ls -la "${APP_OUT_DIR}" | head -n 50 || true
+
+# --- 区域与账户兜底 ---
+ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
+AWS_REGION="${AWS_REGION:-${AWS_DEFAULT_REGION:-}}"
+if [[ -z "${AWS_REGION}" ]]; then
+  AWS_REGION="$(aws configure get region || true)"
+fi
+if [[ -z "${AWS_REGION}" ]]; then
+  echo "[FATAL] AWS region is empty. Set AWS_REGION or AWS_DEFAULT_REGION in environment."
+  exit 1
+fi
+
+# --- 服务名校验 ---
+if [[ -z "${SERVICE_NAME:-}" ]]; then
+  echo "[FATAL] SERVICE_NAME is empty."
+  exit 1
+fi
+
+# --- Docker 可用性检查（privileged 必须开启） ---
+if ! command -v docker >/dev/null 2>&1; then
+  echo "[FATAL] docker is not available. Enable Privileged mode or install docker in the image."
+  exit 1
+fi
+if ! docker info >/dev/null 2>&1; then
+  echo "[FATAL] docker daemon not running or insufficient privilege."
+  exit 1
+fi
+
+# --- 计算镜像信息 ---
+ECR_REPO_URI="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${SERVICE_NAME}"
+TIMESTAMP="$(date -u +%Y%m%d%H%M%S)"   # 用 UTC 更可复现
+IMAGE_TAG="${TIMESTAMP}.${COMMIT7:-latest}"
+export ECR_REPO_URI IMAGE_TAG
+
+echo "== Ensure ECR repo & login =="
+aws ecr describe-repositories --repository-names "${SERVICE_NAME}" --region "$AWS_REGION" >/dev/null 2>&1 \
+  || aws ecr create-repository --repository-name "${SERVICE_NAME}" --region "$AWS_REGION" >/dev/null
+
+aws ecr get-login-password --region "$AWS_REGION" \
+| docker login --username AWS --password-stdin "${ECR_REPO_URI%%/*}"
 
 echo "==> IMAGE_TAG=$IMAGE_TAG"
 echo "==> ECR_REPO_URI=$ECR_REPO_URI"
 
-# 跨阶段共享（给 build / post_build 用）
+# --- 跨阶段共享（写成可 source 的形式） ---
+CI_ENV_FILE="/tmp/ci_env_${CODEBUILD_BUILD_ID//:/_}"
 {
-  echo "ECR_REPO_URI=$ECR_REPO_URI"
-  echo "IMAGE_TAG=$IMAGE_TAG"
+  echo "export ECR_REPO_URI=${ECR_REPO_URI}"
+  echo "export IMAGE_TAG=${IMAGE_TAG}"
 } | tee -a "$CI_ENV_FILE"
+
+echo "Prebuild OK (no extra git operations)."
