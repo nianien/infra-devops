@@ -1,0 +1,62 @@
+[
+  {
+    "ParameterKey": "PipelineName",
+    "ParameterValue": "infra-dev"
+  },
+  {
+    "ParameterKey": "Env",
+    "ParameterValue": "dev"
+  },
+  {
+    "ParameterKey": "CloudFormationDeployRoleArn",
+    "ParameterValue": "arn:aws:iam::297997107448:role/CloudFormationDeployRole"
+  },
+  {
+    "ParameterKey": "CodePipelineRoleArn",
+    "ParameterValue": "arn:aws:iam::297997107448:role/CodePipelineRole"
+  },
+  {
+    "ParameterKey": "ConnectionArn",
+    "ParameterValue": "arn:aws:codeconnections:us-east-1:297997107448:connection/9adfd918-2843-4147-9bc9-c4ee1a99bc39"
+  },
+  {
+    "ParameterKey": "ArtifactBucketName",
+    "ParameterValue": "codepipeline-us-east-1-3622cd43956e-4d23-9284-a18746ff6c07"
+  },
+  {
+    "ParameterKey": "VpcId",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "PublicSubnets",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "PrivateSubnets",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "VpcCidr",
+    "ParameterValue": "10.0.0.0/16"
+  },
+  {
+    "ParameterKey": "PublicSubnetCidr1",
+    "ParameterValue": "10.0.1.0/24"
+  },
+  {
+    "ParameterKey": "PublicSubnetCidr2",
+    "ParameterValue": "10.0.2.0/24"
+  },
+  {
+    "ParameterKey": "PrivateSubnetCidr1",
+    "ParameterValue": "10.0.11.0/24"
+  },
+  {
+    "ParameterKey": "PrivateSubnetCidr2",
+    "ParameterValue": "10.0.12.0/24"
+  },
+  {
+    "ParameterKey": "CreateNatGateways",
+    "ParameterValue": "single"
+  }
+]

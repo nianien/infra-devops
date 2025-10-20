@@ -1,0 +1,38 @@
+[
+  {
+    "ParameterKey": "PipelineName",
+    "ParameterValue": "infra-prod"
+  },
+  {
+    "ParameterKey": "Env",
+    "ParameterValue": "prod"
+  },
+  {
+    "ParameterKey": "CloudFormationDeployRoleArn",
+    "ParameterValue": "arn:aws:iam::297997107448:role/CloudFormationDeployRole"
+  },
+  {
+    "ParameterKey": "CodePipelineRoleArn",
+    "ParameterValue": "arn:aws:iam::297997107448:role/CodePipelineRole"
+  },
+  {
+    "ParameterKey": "ConnectionArn",
+    "ParameterValue": "arn:aws:codeconnections:us-east-1:297997107448:connection/9adfd918-2843-4147-9bc9-c4ee1a99bc39"
+  },
+  {
+    "ParameterKey": "ArtifactBucketName",
+    "ParameterValue": "codepipeline-us-east-1-prod-bucket"
+  },
+  {
+    "ParameterKey": "VpcId",
+    "ParameterValue": "vpc-12345678"
+  },
+  {
+    "ParameterKey": "PublicSubnets",
+    "ParameterValue": "subnet-11111111,subnet-22222222"
+  },
+  {
+    "ParameterKey": "PrivateSubnets",
+    "ParameterValue": "subnet-33333333,subnet-44444444"
+  }
+]
