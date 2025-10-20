@@ -55,13 +55,15 @@ Conditions:
   LaneAsDefault: !Or
     - !Equals [ !Ref Lane, 'default' ]
     - !Equals [ !Ref Lane, '' ]
+  NotLaneAsDefault: !Not
+    - !Condition LaneAsDefault
 
 Resources:
   LaneTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
       Name: !Sub '${ServiceName}-${Env}-${Lane}-tg'
-      VpcId: !ImportValue 'infra-network-VpcId'
+      VpcId: !ImportValue infra-network-VpcId
       TargetType: ip
       Protocol: HTTP
       Port: !Ref WebServerPort
@@ -75,14 +77,14 @@ Resources:
 
   LaneListenerRule:
     Type: AWS::ElasticLoadBalancingV2::ListenerRule
-    Condition: !Not [ LaneAsDefault ]
+    Condition: NotLaneAsDefault
     Properties:
-      ListenerArn: !ImportValue 'boot-alb-${ServiceName}-${Env}-HttpListenerArn'
+      ListenerArn:
+        Fn::ImportValue:
+          Fn::Sub: 'boot-alb-${ServiceName}-${Env}-HttpListenerArn'
       Priority: 100
-      RuleName: !Sub '${ServiceName}-${Env}-${Lane}-rule'
       Conditions:
-        - Field: http-header
-          HttpHeaderConfig:
+        - HttpHeaderConfig:
             HttpHeaderName: 'tracestate'
             Values:
               - !Sub 'ctx=lane:${Lane}'
@@ -130,8 +132,10 @@ Resources:
           LogConfiguration:
             LogDriver: awslogs
             Options:
-              awslogs-group: !ImportValue 'boot-log-${ServiceName}-${Env}-LogGroupName'
-              awslogs-region: !Ref AWS::Region
+              awslogs-group:
+                Fn::ImportValue:
+                  Fn::Sub: 'boot-log-${ServiceName}-${Env}-LogGroupName'
+              awslogs-region: !Ref 'AWS::Region'
               awslogs-stream-prefix: !If
                 - LaneAsDefault
                 - 'default'
@@ -144,7 +148,9 @@ Resources:
         - LaneAsDefault
         - !Sub '${ServiceName}-${Env}-default'
         - !Sub '${ServiceName}-${Env}-${Lane}'
-      Cluster: !ImportValue 'ecs-cluster-${Env}-ClusterName'
+      Cluster:
+        Fn::ImportValue:
+          Fn::Sub: 'ecs-cluster-${Env}-ClusterName'
       LaunchType: FARGATE
       DesiredCount: !Ref DesiredCount
       TaskDefinition: !Ref TaskDef
@@ -156,12 +162,12 @@ Resources:
         MinimumHealthyPercent: 100
       NetworkConfiguration:
         AwsvpcConfiguration:
-          Subnets: !ImportValue 'infra-network-PrivateSubnets'
-          SecurityGroups: !Ref AWS::NoValue
+          Subnets: !Split [ ",", { "Fn::ImportValue": "infra-network-PrivateSubnets" } ]
           AssignPublicIp: ENABLED
       ServiceRegistries:
-        - RegistryArn: !ImportValue
-            Fn::Sub: 'boot-sd-${ServiceName}-${Env}-service-arn'
+        - RegistryArn:
+            Fn::ImportValue:
+              Fn::Sub: 'boot-sd-${ServiceName}-${Env}-service-arn'
           ContainerName: !Ref ServiceName
           ContainerPort: !Ref RpcServerPort
       EnableECSManagedTags: true
@@ -188,7 +194,9 @@ Outputs:
     Value: !Ref TaskDef
   DiscoveryServiceArn:
     Description: 'Cloud Map Service ARN'
-    Value: !ImportValue 'boot-sd-${ServiceName}-${Env}-service-arn'
+    Value:
+      Fn::ImportValue:
+        Fn::Sub: 'boot-sd-${ServiceName}-${Env}-service-arn'
   TargetGroupArn:
     Description: 'Lane Target Group ARN'
     Value: !Ref LaneTargetGroup

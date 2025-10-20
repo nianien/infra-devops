@@ -61,7 +61,7 @@ Resources:
 
       Variables:
         - Name: Service
-          DefaultValue: 'demo-service'
+          DefaultValue: 'demo-web-api'
           Description: 'ECS service name (e.g. demo-rpc or demo-api). Use lowercase letters, numbers, and hyphens only.'
 
       Stages:
@@ -76,7 +76,7 @@ Resources:
               Configuration:
                 ConnectionArn: !Ref ConnectionArn
                 FullRepositoryId: !Ref FullRepositoryId
-                BranchName: 'master'
+                BranchName: 'main'
                 OutputArtifactFormat: CODE_ZIP
                 DetectChanges: false
               OutputArtifacts:
