@@ -61,7 +61,7 @@ Resources:
 
       Variables:
         - Name: Service
-          DefaultValue: ''
+          DefaultValue: 'demo-service'
           Description: 'ECS service name (e.g. demo-rpc or demo-api). Use lowercase letters, numbers, and hyphens only.'
 
       Stages:

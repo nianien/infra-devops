@@ -43,7 +43,7 @@ Resources:
       Name: !Sub '${ServiceName}-${Env}-alb'
       Scheme: internet-facing
       Type: application
-      Subnets: !ImportValue 'infra-network-PublicSubnets'
+      Subnets: !Split [ ',', !ImportValue 'infra-network-PublicSubnets' ]
       SecurityGroups:
         - !Ref AlbSecurityGroup
 

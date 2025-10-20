@@ -29,7 +29,7 @@
   },
   {
     "ParameterKey": "RestartExecutionOnUpdate",
-    "ParameterValue": "false"
+    "ParameterValue": "true"
   }
 ]
 
