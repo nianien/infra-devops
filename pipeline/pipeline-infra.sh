@@ -114,7 +114,7 @@ check_environment() {
     fi
     
     # 检查参数文件
-    local parameters_file="$SCRIPT_DIR/parameters-${ENV}.json"
+    local parameters_file="$SCRIPT_DIR/infra/parameters-${ENV}.json"
     if [[ ! -f "$parameters_file" ]]; then
         echo "❌ Error: Parameters file not found: $parameters_file"
         echo "   Please create this file with the required parameters."
@@ -163,7 +163,7 @@ deploy_pipeline() {
     echo ""
     
     # 参数文件路径
-    local parameters_file="$SCRIPT_DIR/parameters-${ENV}.json"
+    local parameters_file="$SCRIPT_DIR/infra/parameters-${ENV}.json"
     
     # 从参数文件获取栈名
     local stack_name=$(jq -r '.[] | select(.ParameterKey=="PipelineName") | .ParameterValue' "$parameters_file")
@@ -178,7 +178,7 @@ deploy_pipeline() {
     
     # 构建部署命令
     local deploy_cmd="aws cloudformation deploy \\
-  --template-file $SCRIPT_DIR/pipeline-infra.yaml \\
+  --template-file $SCRIPT_DIR/infra/pipeline.yaml \\
   --stack-name $stack_name \\
   --parameters file://$parameters_file \\
   --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \\
