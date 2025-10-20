@@ -198,7 +198,7 @@ Outputs:
     Description: 'Cloud Map Service ARN'
     Value:
       Fn::ImportValue:
-        Fn::Sub: 'boot-sd-${ServiceName}-${Env}-service-arn'
+        Fn::Sub: 'boot-${ServiceName}-${Env}-${ServiceName}-service-arn'
   TargetGroupArn:
     Description: 'Lane Target Group ARN'
     Value: !Ref LaneTargetGroup
