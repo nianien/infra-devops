@@ -150,15 +150,6 @@ Resources:
                   }
 
       RestartExecutionOnUpdate: !Ref RestartExecutionOnUpdate
-      
-      # 禁用所有阶段的自动转换，防止创建时自动触发
-      DisableInboundStageTransitions:
-        - StageName: DeployServiceDiscovery
-          Reason: "Disable automatic transitions on pipeline creation"
-        - StageName: DeployLog
-          Reason: "Disable automatic transitions on pipeline creation"
-        - StageName: DeployAlb
-          Reason: "Disable automatic transitions on pipeline creation"
 
 Outputs:
   PipelineNameOut:
