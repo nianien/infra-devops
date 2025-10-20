@@ -232,7 +232,7 @@ deploy_pipeline() {
         echo "❌ Error: PipelineName not found in parameters file"
         exit 1
     fi
-    stack_name="infra-pipeline-${ENV}"
+    stack_name="$stack_name-$ENV-pipeline"
     
     # 检查栈状态
     check_stack_status "$stack_name"
