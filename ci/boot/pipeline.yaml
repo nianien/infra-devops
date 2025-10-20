@@ -7,7 +7,7 @@ Parameters:
   # =========================================================
   PipelineName:
     Type: String
-    Default: 'bootstrap-service'
+    Default: 'bootstrap-init'
     Description: 'Service Bootstrap Pipeline name'
 
   Env:
@@ -61,7 +61,7 @@ Resources:
 
       Variables:
         - Name: Service
-          DefaultValue: 'demo-service'
+          DefaultValue: ''
           Description: 'ECS service name (e.g. demo-rpc or demo-api). Use lowercase letters, numbers, and hyphens only.'
 
       Stages:

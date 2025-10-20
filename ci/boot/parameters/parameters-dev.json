@@ -1,7 +1,7 @@
 [
   {
     "ParameterKey": "PipelineName",
-    "ParameterValue": "bootstrap-service"
+    "ParameterValue": "bootstrap-init"
   },
   {
     "ParameterKey": "Env",
