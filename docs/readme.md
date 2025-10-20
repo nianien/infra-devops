@@ -189,7 +189,7 @@ Infra 仓提供构建逻辑模板，业务仓只提供代码。所有服务共�
 
 #### 3.1.2 Bootstrap Pipeline（服务级引导）
 - **模板文件**：`pipeline-boot.yaml`
-- **命名规范**：`bootstrap-{service}-{env}`
+- **命名规范**：`bootstrap-{env}`
 - **部署频率**：新服务接入或服务级基础设施变更时运行
 - **部署资源**：
   - Cloud Map Service（`boot-sd-{service}-{env}`）

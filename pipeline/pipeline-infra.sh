@@ -132,6 +132,67 @@ check_environment() {
 }
 
 # =========================================================
+# 模板校验
+# =========================================================
+validate_templates() {
+    echo "🔍 Validating CloudFormation templates..."
+    
+    # 校验主模板
+    local main_template="$SCRIPT_DIR/infra/pipeline.yaml"
+    if [[ ! -f "$main_template" ]]; then
+        echo "❌ Error: Main template not found: $main_template"
+        exit 1
+    fi
+    
+    echo "   Validating main template: pipeline.yaml"
+    if ! aws cloudformation validate-template \
+        --template-body "file://$main_template" \
+        --region "$AWS_REGION" \
+        --profile "$AWS_PROFILE" >/dev/null 2>&1; then
+        echo "❌ Error: Main template validation failed"
+        echo "   Please check the template syntax and fix errors"
+        exit 1
+    fi
+    echo "   ✅ Main template validation passed"
+    
+    # 校验 VPC 模板
+    local vpc_template="$SCRIPT_DIR/../ci/infra-vpc-stack.yaml"
+    if [[ -f "$vpc_template" ]]; then
+        echo "   Validating VPC template: infra-vpc-stack.yaml"
+        if ! aws cloudformation validate-template \
+            --template-body "file://$vpc_template" \
+            --region "$AWS_REGION" \
+            --profile "$AWS_PROFILE" >/dev/null 2>&1; then
+            echo "❌ Error: VPC template validation failed"
+            echo "   Please check the template syntax and fix errors"
+            exit 1
+        fi
+        echo "   ✅ VPC template validation passed"
+    else
+        echo "   ⚠️  VPC template not found: $vpc_template"
+    fi
+    
+    # 校验 Namespace 模板
+    local namespace_template="$SCRIPT_DIR/../ci/infra-namespace-stack.yaml"
+    if [[ -f "$namespace_template" ]]; then
+        echo "   Validating Namespace template: infra-namespace-stack.yaml"
+        if ! aws cloudformation validate-template \
+            --template-body "file://$namespace_template" \
+            --region "$AWS_REGION" \
+            --profile "$AWS_PROFILE" >/dev/null 2>&1; then
+            echo "❌ Error: Namespace template validation failed"
+            echo "   Please check the template syntax and fix errors"
+            exit 1
+        fi
+        echo "   ✅ Namespace template validation passed"
+    else
+        echo "   ⚠️  Namespace template not found: $namespace_template"
+    fi
+    
+    echo "✅ All template validations passed"
+}
+
+# =========================================================
 # 检查栈状态
 # =========================================================
 check_stack_status() {
@@ -180,7 +241,8 @@ deploy_pipeline() {
     local deploy_cmd="aws cloudformation deploy \\
   --template-file $SCRIPT_DIR/infra/pipeline.yaml \\
   --stack-name $stack_name \\
-  --parameters file://$parameters_file \\
+  --parameter-overrides \\
+    \$(jq -r '.[] | \"\\(.ParameterKey)=\\(.ParameterValue)\"' $parameters_file) \\
   --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \\
   --region $AWS_REGION \\
   --profile $AWS_PROFILE"
@@ -232,6 +294,7 @@ main() {
     echo ""
     
     check_environment
+    validate_templates
     deploy_pipeline
     
     echo "🎉 All done!"

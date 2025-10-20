@@ -39,53 +39,30 @@ Parameters:
   # =========================================================
   # Network Parameters
   # =========================================================
-  # VPC 复用配置（留空则自建，非空则复用现有 VPC）
-  VpcId:
-    Type: String
-    Default: ''
-    Description: 'Existing VPC ID; leave empty to create a new VPC'
-
-  PublicSubnets:
-    Type: CommaDelimitedList
-    Default: ''
-    Description: 'Existing public subnet IDs when reusing (comma separated)'
-
-  PrivateSubnets:
-    Type: CommaDelimitedList
-    Default: ''
-    Description: 'Existing private subnet IDs when reusing (comma separated)'
-
-  # VPC 创建配置（仅在 VpcId 为空时有效）
   VpcCidr:
     Type: String
     Default: '10.0.0.0/16'
-    Description: 'VPC CIDR block (create mode only)'
+    Description: 'VPC CIDR block'
 
   PublicSubnetCidr1:
     Type: String
     Default: '10.0.1.0/24'
-    Description: 'Public subnet 1 CIDR block (create mode only)'
+    Description: 'Public subnet 1 CIDR block'
 
   PublicSubnetCidr2:
     Type: String
     Default: '10.0.2.0/24'
-    Description: 'Public subnet 2 CIDR block (create mode only)'
+    Description: 'Public subnet 2 CIDR block'
 
   PrivateSubnetCidr1:
     Type: String
     Default: '10.0.11.0/24'
-    Description: 'Private subnet 1 CIDR block (create mode only)'
+    Description: 'Private subnet 1 CIDR block'
 
   PrivateSubnetCidr2:
     Type: String
     Default: '10.0.12.0/24'
-    Description: 'Private subnet 2 CIDR block (create mode only)'
-
-  CreateNatGateways:
-    Type: String
-    AllowedValues: [ 'none', 'single', 'ha' ]
-    Default: 'single'
-    Description: "NAT strategy when creating VPC: 'none' | 'single' (cost-opt) | 'ha' (per-AZ)"
+    Description: 'Private subnet 2 CIDR block'
 
 Resources:
   Pipeline:
@@ -134,15 +111,11 @@ Resources:
                 ParameterOverrides: !Sub |
                   {
                     "Env": "${Env}",
-                    "VpcId": "${VpcId}",
-                    "PublicSubnets": "${PublicSubnets}",
-                    "PrivateSubnets": "${PrivateSubnets}",
                     "VpcCidr": "${VpcCidr}",
                     "PublicSubnetCidr1": "${PublicSubnetCidr1}",
                     "PublicSubnetCidr2": "${PublicSubnetCidr2}",
                     "PrivateSubnetCidr1": "${PrivateSubnetCidr1}",
-                    "PrivateSubnetCidr2": "${PrivateSubnetCidr2}",
-                    "CreateNatGateways": "${CreateNatGateways}"
+                    "PrivateSubnetCidr2": "${PrivateSubnetCidr2}"
                   }
 
         - Name: DeployNamespace

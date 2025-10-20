@@ -24,15 +24,23 @@
     "ParameterValue": "codepipeline-us-east-1-prod-bucket"
   },
   {
-    "ParameterKey": "VpcId",
-    "ParameterValue": "vpc-12345678"
+    "ParameterKey": "VpcCidr",
+    "ParameterValue": "10.0.0.0/16"
   },
   {
-    "ParameterKey": "PublicSubnets",
-    "ParameterValue": "subnet-11111111,subnet-22222222"
+    "ParameterKey": "PublicSubnetCidr1",
+    "ParameterValue": "10.0.1.0/24"
   },
   {
-    "ParameterKey": "PrivateSubnets",
-    "ParameterValue": "subnet-33333333,subnet-44444444"
+    "ParameterKey": "PublicSubnetCidr2",
+    "ParameterValue": "10.0.2.0/24"
+  },
+  {
+    "ParameterKey": "PrivateSubnetCidr1",
+    "ParameterValue": "10.0.11.0/24"
+  },
+  {
+    "ParameterKey": "PrivateSubnetCidr2",
+    "ParameterValue": "10.0.12.0/24"
   }
 ]
