@@ -61,6 +61,7 @@ Conditions:
 Resources:
   LaneTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Condition: NotLaneAsDefault
     Properties:
       Name: !Sub '${ServiceName}-${Env}-${Lane}-tg'
       VpcId:
@@ -182,10 +183,12 @@ Resources:
         - !Ref 'AWS::NoValue'
         - - Key: Lane
             Value: !Ref Lane
-      LoadBalancers:
-        - TargetGroupArn: !Ref LaneTargetGroup
-          ContainerName: !Ref ServiceName
-          ContainerPort: !Ref WebServerPort
+      LoadBalancers: !If
+        - NotLaneAsDefault
+        - - TargetGroupArn: !Ref LaneTargetGroup
+            ContainerName: !Ref ServiceName
+            ContainerPort: !Ref WebServerPort
+        - !Ref 'AWS::NoValue'
 
 Outputs:
   ServiceArn:
@@ -200,5 +203,6 @@ Outputs:
       Fn::ImportValue:
         Fn::Sub: 'boot-${ServiceName}-${Env}-${ServiceName}-service-arn'
   TargetGroupArn:
+    Condition: NotLaneAsDefault
     Description: 'Lane Target Group ARN'
     Value: !Ref LaneTargetGroup
