@@ -10,8 +10,7 @@ echo "BRANCH=${BRANCH:-}"
 
 # --- 目录就绪性 ---
 SRC_DIR="${CODEBUILD_SRC_DIR:-}"
-APP_OUT_DIR_VAR="CODEBUILD_SRC_DIR_AppOut"
-APP_OUT_DIR="${!APP_OUT_DIR_VAR:-}"
+APP_OUT_DIR=APP_OUT_DIR="${CODEBUILD_SRC_DIR_AppOut}"
 
 if [[ -z "$SRC_DIR" || ! -d "$SRC_DIR" ]]; then
   echo "[FATAL] Primary source dir not found: CODEBUILD_SRC_DIR='${SRC_DIR:-<empty>}'"
@@ -27,13 +26,8 @@ echo "== Sources =="
 echo "Primary: ${SRC_DIR}"
 echo "AppOut : ${APP_OUT_DIR}"
 
-# --- 解析提交信息（本地只读，不触网） ---
-echo "Resolved primary version: ${CODEBUILD_RESOLVED_SOURCE_VERSION:-<n/a>}"
-echo "Resolved AppOut version : ${CODEBUILD_RESOLVED_SOURCE_VERSION_AppOut:-<n/a>}"
-
 COMMIT7="$(cd "${APP_OUT_DIR}" && git rev-parse --short=7 HEAD 2>/dev/null || echo 'latest')"
 echo "== AppOut commit: ${COMMIT7}"
-ls -la "${APP_OUT_DIR}" | head -n 50 || true
 
 # --- 区域与账户兜底 ---
 ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
