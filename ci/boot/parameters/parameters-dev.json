@@ -1,0 +1,27 @@
+[
+  {
+    "ParameterKey": "PipelineName",
+    "ParameterValue": "boot-init"
+  },
+  {
+    "ParameterKey": "CloudFormationDeployRoleArn",
+    "ParameterValue": "arn:aws:iam::297997107448:role/CloudFormationDeployRole"
+  },
+  {
+    "ParameterKey": "CodePipelineRoleArn",
+    "ParameterValue": "arn:aws:iam::297997107448:role/CodePipelineRole"
+  },
+  {
+    "ParameterKey": "ConnectionArn",
+    "ParameterValue": "arn:aws:codeconnections:us-east-1:297997107448:connection/9adfd918-2843-4147-9bc9-c4ee1a99bc39"
+  },
+  {
+    "ParameterKey": "ArtifactBucketName",
+    "ParameterValue": "codepipeline-us-east-1-3622cd43956e-4d23-9284-a18746ff6c07"
+  },
+  {
+    "ParameterKey": "FullRepositoryId",
+    "ParameterValue": "nianien/infra-devops"
+  }
+]
+

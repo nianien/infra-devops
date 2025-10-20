@@ -53,8 +53,8 @@ Conditions:
   LaneIsDefault: !Equals [ !Ref Lane, 'default' ]
   LaneIsEmpty: !Equals [ !Ref Lane, '' ]
   LaneAsDefault: !Or
-    - !Condition LaneIsDefault
-    - !Condition LaneIsEmpty
+    - !Equals [ !Ref Lane, 'default' ]
+    - !Equals [ !Ref Lane, '' ]
 
 Resources:
   LaneTargetGroup:
