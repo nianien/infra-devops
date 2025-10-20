@@ -2,71 +2,239 @@
 
 ## 1. 执行摘要
 
-本方案基于 AWS CodePipeline 和 CloudFormation 构建了一套支持多泳道并行部署的 ECS 持续交付系统。通过动态泳道管理和共享基础设施层设计，实现了高并发、零冲突的微服务部署能力。
+本方案基于 AWS CodePipeline 和 CloudFormation 构建了一套支持多泳道并行部署的 ECS 持续交付系统。通过双仓架构设计、分层 Pipeline 架构和共享基础设施层设计，实现了 DevOps 模板集中治理、高并发、零冲突的微服务部署能力。
 
 ### 1.1 核心特性
-- **并行无锁部署**：基于单 Pipeline 模板批量生成多环境流水线，支持多泳道并行执行
+- **双仓架构设计**：Infra 仓集中管理 DevOps 模板，App 仓专注业务代码，实现模板统一治理
+- **分层 Pipeline 架构**：环境级、服务级、应用级三层 Pipeline 分离，职责清晰
+- **统一 BuildSpec**：所有服务共享同一 buildspec.yaml，通过双源输入机制访问业务代码
+- **并行无锁部署**：不同层级 Pipeline 独立运行，支持多泳道并行执行
 - **动态泳道管理**：运行时通过变量指定泳道和分支，无需预定义泳道配置
-- **基础设施共享**：VPC、ALB、Cloud Map 等共享层与业务层解耦，避免并发更新冲突
+- **基础设施共享**：VPC、Cloud Map Namespace 等环境级资源与业务层解耦
 - **智能流量路由**：基于 W3C Trace Context 标准的 `tracestate` 头部进行精确流量分发
 - **闭环参数传递**：CodeBuild 内完成构建和部署，确保参数传递的一致性和可靠性
 
 ## 2. 架构设计
 
-### 2.1 系统架构概览
+### 2.1 双仓架构 + 统一 BuildSpec 技术方案
 
-系统采用分层架构设计，将基础设施层与业务应用层完全解耦：
+#### 2.1.1 问题定义
+
+**现状**：
+- 各服务的 CI/CD 模板分散在业务仓中，buildspec、pipeline.yaml、CFN 模板版本不统一
+- DevOps 统一升级难、合规难、治理成本高
+- 希望在保持业务仓独立开发的前提下，集中统一 CI/CD 流程逻辑
+
+**目标**：
+通过双仓结构实现 DevOps 模板集中治理、业务代码独立演进。所有服务共享统一 buildspec.yaml 与 CloudFormation 模板。
+
+#### 2.1.2 核心方案
+
+**仓库职责划分**：
+
+| 仓库 | 内容 | 示例路径 |
+|------|------|----------|
+| Infra Repo | 统一 DevOps 模板（buildspec、pipeline、CFN 模板、通用脚本） | `ci/buildspec.yaml`、`ci/service-stack.yaml` |
+| App Repo | 各服务代码（源代码、Dockerfile、配置文件等） | `src/`, `Dockerfile` |
+
+**CodePipeline 双源输入设计**：
+
+```yaml
+Stages:
+  - Name: Source
+    Actions:
+      - Name: AppSource
+        Provider: CodeStarSourceConnection
+        OutputArtifacts: [ AppOut ]
+      - Name: InfraSource
+        Provider: CodeStarSourceConnection
+        OutputArtifacts: [ InfraOut ]
+```
+
+- **AppOut**：业务代码
+- **InfraOut**：CI 模板与 buildspec
+
+**Build 阶段关键配置**：
+
+```yaml
+- Name: Build
+  Actions:
+    - Name: CodeBuild
+      InputArtifacts:
+        - Name: InfraOut   # 主输入，buildspec来源
+        - Name: AppOut     # 副输入，业务代码
+      Configuration:
+        ProjectName: !Ref CodeBuildProject
+```
+
+**CodeBuild 项目配置**：
+
+```yaml
+Source:
+  Type: CODEPIPELINE
+  BuildSpec: 'ci/buildspec.yaml'   # 从 InfraOut 获取
+```
+
+✅ 主输入 (InfraOut) 提供统一 buildspec  
+✅ 副输入 (AppOut) 提供业务代码
+
+**BuildSpec 访问业务代码**：
+
+CodeBuild 容器中自动挂载两个目录：
+
+| 环境变量 | 内容 |
+|----------|------|
+| `$CODEBUILD_SRC_DIR` | InfraOut（buildspec 所在目录） |
+| `$CODEBUILD_SRC_DIR_AppOut` | AppOut（业务代码仓） |
+
+**示例**：
+
+```yaml
+pre_build:
+  commands:
+    - cd $CODEBUILD_SRC_DIR_AppOut/$MODULE_PATH
+    - docker build -t $SERVICE_NAME .
+    - docker tag $SERVICE_NAME:$CODEBUILD_RESOLVED_SOURCE_VERSION $ECR_URI/$SERVICE_NAME:$SERVICE_VERSION
+    - docker push $ECR_URI/$SERVICE_NAME:$SERVICE_VERSION
+```
+
+Infra 仓提供构建逻辑模板，业务仓只提供代码。所有服务共用同一 buildspec。
+
+**Deploy 阶段**：
+- 模板路径固定：`InfraOut::ci/service-stack.yaml`
+- 制品来源：`BuildOut::cfn-params.json`
+- StackName：`app-${ServiceName}-${Env}-${Lane}`
+
+#### 2.1.3 方案优势
+
+| 目标 | 实现 |
+|------|------|
+| 模板统一 | 所有服务使用同一 buildspec 与部署模板 |
+| 低运维成本 | DevOps 团队集中治理模板，无需逐仓维护 |
+| 业务独立 | 各服务仓仅含代码，可独立开发与部署 |
+| 可扩展 | 新服务只需引入模板仓路径即可部署 |
+| 可控版本 | Infra Repo 版本化；构建模板随 Tag 管理 |
+
+### 2.2 系统架构概览
+
+系统采用三层 Pipeline 架构设计，将环境级、服务级、应用级资源完全解耦：
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    共享基础设施层                              │
+│                    Pipeline 架构层                           │
 ├─────────────────────────────────────────────────────────────┤
-│  VPC Stack    │  ALB Stack    │  Cloud Map    │  Log Stack   │
-│  (网络层)      │  (负载均衡)    │  (服务发现)    │  (日志聚合)   │
+│  Infra Pipeline    │  Bootstrap Pipeline  │  App Pipeline   │
+│  (环境级共享)       │  (服务级引导)        │  (应用部署)      │
 └─────────────────────────────────────────────────────────────┘
                               │
-                              │ Export/Import
+                              │ 资源依赖关系
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                    业务应用层                                │
+│                    基础设施资源层                             │
 ├─────────────────────────────────────────────────────────────┤
-│  Lane Stack (app-{service}-{env}-{lane})                    │
-│  ├─ Task Definition                                         │
-│  ├─ ECS Service                                            │
-│  ├─ Target Group                                           │
-│  └─ Listener Rule                                          │
+│ 环境级共享          │ 服务级共享          │ 应用级资源        │
+│ ├─ VPC Stack       │ ├─ Cloud Map Service│ ├─ Task Definition│
+│ ├─ Cloud Map NS    │ ├─ LogGroup         │ ├─ ECS Service    │
+│                    │ └─ ALB Stack        │ ├─ Target Group   │
+│                    │                     │ └─ Listener Rule  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ### 2.2 命名规范
 
 #### 2.2.1 Pipeline 命名
-- **Pipeline 名称**：`{service}-{env}`
-- **示例**：`user-api-dev`, `order-service-prod`
+- **Infra Pipeline**：`infra-{env}`（环境级共享）
+- **Bootstrap Pipeline**：`bootstrap-{service}-{env}`（服务级引导）
+- **App Pipeline**：`{service}-{env}`（应用部署）
+- **示例**：`infra-dev`, `bootstrap-user-api-dev`, `user-api-dev`
 - **触发变量**：`lane`, `branch`（运行时必填）
 
 #### 2.2.2 资源命名规范
 | 资源类型 | 命名模式 | 示例 | 说明 |
 |---------|---------|------|------|
+| **环境级共享** | | | |
+| VPC Stack | `network-stack` | `network-stack` | 网络基础设施栈 |
+| Cloud Map Namespace | `{env}.local` | `dev.local` | 服务发现命名空间 |
+| **服务级共享** | | | |
+| Cloud Map Service Stack | `sd-service-shared-{service}-{env}` | `sd-service-shared-user-api-dev` | 服务发现栈 |
+| LogGroup Stack | `log-shared-{service}-{env}` | `log-shared-user-api-dev` | 日志组栈 |
+| ALB Stack | `alb-shared-{service}-{env}` | `alb-shared-user-api-dev` | 负载均衡栈 |
+| Application Load Balancer | `{service}-{env}-alb` | `user-api-dev-alb` | 负载均衡器 |
+| Cloud Map Service | `{service}` | `user-api` | 服务发现服务 |
+| Log Group | `/ecs/{env}/{service}` | `/ecs/dev/user-api` | 日志组 |
+| **应用级资源** | | | |
 | Application Stack | `app-{service}-{env}-{lane}` | `app-user-api-dev-gray` | 业务应用栈 |
 | Task Definition | `{service}-{lane}-{env}-task` | `user-api-gray-dev-task` | 任务定义 |
 | ECS Service | `{service}-{env}-{lane}` | `user-api-dev-gray` | ECS 服务 |
 | Target Group | `{service}-{env}-{lane}-tg` | `user-api-dev-gray-tg` | 目标组 |
 | Listener Rule | `{service}-{env}-{lane}-rule` | `user-api-dev-gray-rule` | 监听规则 |
-| Application Load Balancer | `{service}-{env}-alb` | `user-api-dev-alb` | 负载均衡器 |
-| Cloud Map Namespace | `{env}.local` | `dev.local` | 服务发现命名空间 |
-| Cloud Map Service | `{service}` | `user-api` | 服务发现服务 |
-| Log Group | `/ecs/{env}/{ServiceBase}` | `/ecs/dev/user-api` | 日志组 |
 
 **设计原则**：Target Group 和 Listener Rule 归属于 Lane Stack，实现泳道级别的资源隔离，新增泳道无需修改共享基础设施。
 
-## 3. 栈架构设计
+## 3. 三层 Pipeline 架构
 
-### 3.1 共享基础设施层
+### 3.1 Pipeline 分层设计
+
+系统采用三层 Pipeline 架构，实现职责清晰分离和并发无锁部署：
+
+#### 3.1.1 Infra Pipeline（环境级共享）
+- **模板文件**：`pipeline-infra.yaml`
+- **命名规范**：`infra-{env}`
+- **部署频率**：环境初始化时运行一次，后续很少变更
+- **部署资源**：
+  - VPC 网络栈（`network-stack`）
+  - Cloud Map Namespace（`sd-namespace-shared`）
+- **特点**：环境级资源，所有服务共享，避免并发更新冲突
+
+#### 3.1.2 Bootstrap Pipeline（服务级引导）
+- **模板文件**：`pipeline-bootstrap.yaml`
+- **命名规范**：`bootstrap-{service}-{env}`
+- **部署频率**：新服务接入或服务级基础设施变更时运行
+- **部署资源**：
+  - Cloud Map Service（`sd-service-shared-{service}-{env}`）
+  - LogGroup（`log-shared-{service}-{env}`）
+  - ALB 栈（`alb-shared-{service}-{env}`）
+- **特点**：服务级资源，按服务隔离，支持并行部署
+
+#### 3.1.3 App Pipeline（应用部署）
+- **模板文件**：`pipeline-app.yaml`
+- **命名规范**：`{service}-{env}`
+- **部署频率**：日常业务发布，支持多泳道并行
+- **部署资源**：
+  - Lane 应用栈（`app-{service}-{env}-{lane}`）
+  - Task Definition、ECS Service、Target Group、Listener Rule
+- **特点**：应用级资源，按泳道隔离，支持高并发部署
+
+### 3.2 Pipeline 依赖关系
+
+```
+Infra Pipeline (环境级)
+    ↓ 导出环境级资源
+Bootstrap Pipeline (服务级)
+    ↓ 导出服务级资源
+App Pipeline (应用级)
+    ↓ 创建应用级资源
+```
+
+### 3.3 并发控制机制
+
+#### 3.3.1 层级隔离
+- **环境级**：`infra-{env}` 独立运行，不与其他 Pipeline 冲突
+- **服务级**：`bootstrap-{service}-{env}` 按服务隔离，不同服务可并行
+- **应用级**：`{service}-{env}` 按泳道隔离，同服务多泳道可并行
+
+#### 3.3.2 资源锁机制
+- **CloudFormation 单栈锁**：每个栈独立锁定，不同栈可并行
+- **共享资源只读**：业务发布过程中只读引用共享资源
+- **栈级隔离**：不同层级使用不同栈名，避免锁冲突
+
+## 4. 栈架构设计
+
+### 4.1 环境级共享基础设施层
 
 共享层负责提供基础网络、负载均衡、服务发现和日志聚合能力，采用只读引用模式，避免业务发布时的并发冲突。
 
-#### 3.1.1 VPC 网络栈
+#### 4.1.1 VPC 网络栈
 - **栈名称**：`network-stack`
 - **职责**：包装现有 VPC 资源，提供网络基础设施
 - **导出资源**：
@@ -74,20 +242,24 @@
   - `PrivateSubnets`：私有子网列表
   - `PublicSubnets`：公有子网列表
   - `SecurityGroups`：安全组列表（可选）
-- **使用方**：ALB 栈、Lane 栈（通过 ImportValue 引用）
+- **使用方**：Bootstrap Pipeline、App Pipeline（通过 ImportValue 引用）
 
-#### 3.1.2 服务发现栈
-- **Namespace 栈**：`sd-namespace-shared`
-  - **控制开关**：`initCloudMap=true`
-  - **创建资源**：Cloud Map Private DNS Namespace `{env}.local`
-  - **导出资源**：`NamespaceId`
-- **Service 栈**：`sd-service-shared-{service}`
-  - **创建资源**：Cloud Map Service `{service}`
-  - **导出资源**：`SdServiceId`
+#### 4.1.2 Cloud Map Namespace 栈
+- **栈名称**：`sd-namespace-shared`
+- **创建资源**：Cloud Map Private DNS Namespace `{env}.local`
+- **导出资源**：`NamespaceId`
+- **使用方**：Bootstrap Pipeline（通过 ImportValue 引用）
 
-#### 3.1.3 负载均衡栈
+### 4.2 服务级共享基础设施层
+
+#### 4.2.1 Cloud Map Service 栈
+- **栈名称**：`sd-service-shared-{service}-{env}`
+- **创建资源**：Cloud Map Service `{service}`
+- **导出资源**：`SdServiceId`
+- **使用方**：App Pipeline（通过 ImportValue 引用）
+
+#### 4.2.2 负载均衡栈
 - **栈名称**：`alb-shared-{service}-{env}`
-- **控制开关**：`initAlb=true`
 - **创建资源**：
   - Application Load Balancer：`{service}-{env}-alb`
   - HTTP Listener：端口 80
@@ -96,18 +268,20 @@
   - `LoadBalancerArn`：负载均衡器 ARN
   - `DnsName`：负载均衡器 DNS 名称
   - `HttpListenerArn`：HTTP 监听器 ARN
+- **使用方**：App Pipeline（通过 ImportValue 引用）
 
-#### 3.1.4 日志聚合栈
+#### 4.2.3 日志聚合栈
 - **栈名称**：`log-shared-{service}-{env}`
-- **控制开关**：`initlog=true`
-- **创建资源**：CloudWatch Log Group `/ecs/{env}/{ServiceBase}`
+- **创建资源**：CloudWatch Log Group `/ecs/{env}/{service}`
 - **配置**：日志保留期 30 天
+- **导出资源**：`LogGroupName`
+- **使用方**：App Pipeline（通过 ImportValue 引用）
 
-### 3.2 业务应用层
+### 4.3 应用级资源层
 
 业务层采用每泳道一栈的设计，实现完全的资源隔离和并行部署能力。
 
-#### 3.2.1 Lane 应用栈
+#### 4.3.1 Lane 应用栈
 - **栈名称**：`app-{service}-{env}-{lane}`
 - **创建资源**：
   - **Task Definition**：`{service}-{lane}-{env}-task`
@@ -127,34 +301,48 @@
 
 **并发特性**：不同 Lane 使用不同的栈名称，CloudFormation 采用单栈锁机制，各 Lane 可并行部署而不产生锁冲突。
 
-## 4. Pipeline 编排与执行流程
+## 5. Pipeline 编排与执行流程
 
-### 4.1 Pipeline 生成策略
+### 5.1 三层 Pipeline 执行策略
 
-基于统一的 `pipeline.yaml` 配置文件，系统自动为每个服务-环境组合生成独立的 Pipeline：
+系统采用三层 Pipeline 架构，每层有独立的执行策略和触发机制：
 
-- **生成规则**：每条配置记录生成一个 Pipeline `{service}-{env}`
-- **模板参数**：从配置文件继承 `service`, `repo`, `module_path`, `env`, `cluster_name`, `vpc`
-- **默认分支**：`branch` 字段作为默认值，实际发布时通过触发变量覆盖
+#### 5.1.1 Infra Pipeline 执行
+- **触发方式**：手动触发或环境初始化时自动触发
+- **执行频率**：环境级变更时执行，通常很少变更
+- **并发控制**：同一环境只有一个 Infra Pipeline 实例
 
-### 4.2 触发机制与变量管理
+#### 5.1.2 Bootstrap Pipeline 执行
+- **触发方式**：新服务接入或服务级基础设施变更时手动触发
+- **执行频率**：服务级变更时执行，相对较少
+- **并发控制**：不同服务的 Bootstrap Pipeline 可并行执行
 
-#### 4.2.1 运行时变量
-- **必填变量**：`lane`, `branch`
+#### 5.1.3 App Pipeline 执行
+- **触发方式**：日常业务发布，支持多泳道并行触发
+- **执行频率**：高频执行，支持持续集成/持续部署
+- **并发控制**：同服务多泳道可并行，不同服务可并行
+
+### 5.2 触发机制与变量管理
+
+#### 5.2.1 运行时变量
+- **App Pipeline 必填变量**：`lane`, `branch`
+- **Bootstrap Pipeline 变量**：`service`, `env`（通过参数传递）
+- **Infra Pipeline 变量**：`env`（通过参数传递）
 - **并发支持**：可同时触发多个 Lane（如 `lane=gray`, `lane=blue`），部署到不同栈实现并行执行
 
-#### 4.2.2 变量传递链路
+#### 5.2.2 变量传递链路
 ```
 触发变量 → CodeBuild 环境变量 → 部署参数文件 → CloudFormation 参数
 ```
 
-### 4.3 执行阶段设计
+### 5.3 执行阶段设计
 
-#### 4.3.1 Source 阶段
-- **代码获取**：按指定 `branch` 拉取源代码
-- **分支处理**：如 Source Action 不支持运行时分支，在 Build 阶段执行 `git checkout $branch`
+#### 5.3.1 Source 阶段
+- **Infra Pipeline**：从 `nianien/infra-devops` 仓库获取基础设施模板
+- **Bootstrap Pipeline**：从 `nianien/infra-devops` 仓库获取基础设施模板
+- **App Pipeline**：从应用仓库获取应用代码，从 `nianien/infra-devops` 获取基础设施模板
 
-#### 4.3.2 Build 阶段（CodeBuild）
+#### 5.3.2 Build 阶段（仅 App Pipeline）
 - **环境变量注入**：
   ```bash
   SERVICE_NAME=${service}
@@ -183,17 +371,22 @@
     --parameter-overrides file://deploy-params.json
   ```
 
-#### 4.3.3 Verify 阶段
+#### 5.3.3 Deploy 阶段
+- **Infra Pipeline**：部署环境级共享资源（VPC、Cloud Map Namespace）
+- **Bootstrap Pipeline**：部署服务级共享资源（Cloud Map Service、LogGroup、ALB）
+- **App Pipeline**：部署应用级资源（Task Definition、ECS Service、Target Group、Listener Rule）
+
+#### 5.3.4 Verify 阶段（仅 App Pipeline）
 - **健康检查**：验证目标 Target Group 健康实例数量 > 0
 - **功能验证**：执行 `curl /healthz` 确认服务可用性
 
-**设计优势**：采用"Build+Deploy 合一"模式，在单一 CodeBuild 任务中完成构建和部署，避免跨 Action 参数传递导致的数据丢失或不一致问题。
+**设计优势**：采用分层部署模式，每层 Pipeline 职责清晰，避免跨层级资源冲突，支持高并发部署。
 
-## 5. 参数管理与环境变量
+## 6. 参数管理与环境变量
 
-### 5.1 参数分类与来源
+### 6.1 参数分类与来源
 
-#### 5.1.1 静态模板参数
+#### 6.1.1 静态模板参数
 **来源**：`pipeline.yaml` 配置文件
 - `service`：服务名称
 - `repo`：代码仓库地址
@@ -374,26 +567,43 @@ Pipeline 配置 → 触发变量 → CodeBuild 环境 → 部署参数文件 →
 
 ## 8. 端到端部署流程
 
-### 8.1 标准发布流程
+### 8.1 环境初始化流程
 
-#### 8.1.1 触发阶段
+#### 8.1.1 环境级基础设施部署
+1. **部署 Infra Pipeline**：`infra-{env}`
+2. **创建环境级资源**：
+   - VPC 网络栈（`network-stack`）
+   - Cloud Map Namespace（`sd-namespace-shared`）
+3. **导出环境级资源**：供后续 Pipeline 引用
+
+#### 8.1.2 服务级基础设施部署
+1. **部署 Bootstrap Pipeline**：`bootstrap-{service}-{env}`
+2. **创建服务级资源**：
+   - Cloud Map Service（`sd-service-shared-{service}-{env}`）
+   - LogGroup（`log-shared-{service}-{env}`）
+   - ALB 栈（`alb-shared-{service}-{env}`）
+3. **导出服务级资源**：供 App Pipeline 引用
+
+### 8.2 标准发布流程
+
+#### 8.2.1 触发阶段
 1. **Pipeline 触发**：`{service}-{env}`
 2. **变量设置**：`lane=gray`, `branch=release/1.2.3`
 3. **代码获取**：按指定分支拉取源代码
 
-#### 8.1.2 构建阶段
+#### 8.2.2 构建阶段
 1. **环境变量注入**：`service`, `module_path`, `env`, `lane`, `branch`
 2. **镜像构建**：构建 Docker 镜像并推送到 ECR
 3. **标签生成**：`ImageTag=sha-xxx`
 4. **参数文件生成**：`deploy-params.json`
 
-#### 8.1.3 部署阶段
+#### 8.2.3 部署阶段
 1. **栈部署**：`app-{service}-{env}-{lane}`
 2. **资源创建**：Task Definition、ECS Service、Target Group
 3. **路由配置**：Listener Rule 匹配 `tracestate: ctx=lane:gray`
 4. **服务注册**：注册到 Cloud Map Service
 
-#### 8.1.4 验证阶段
+#### 8.2.4 验证阶段
 1. **健康检查**：验证 Target Group 健康实例
 2. **功能验证**：执行 `/healthz` 端点检查
 3. **流量验证**：确认流量正确路由
@@ -403,11 +613,15 @@ Pipeline 配置 → 触发变量 → CodeBuild 环境 → 部署参数文件 →
 ### 9.1 环境初始化
 
 #### 9.1.1 基础设施部署顺序
-1. **网络栈**：部署 `network-stack`，导出 VPC 和子网信息
-2. **服务发现**：`initCloudMap=true` 部署 Namespace 和 Service
-3. **负载均衡**：`initAlb=true` 部署 ALB 和默认 Target Group
-4. **日志系统**：`initlog=true` 部署 Log Group
-5. **Pipeline 生成**：从 `pipeline.yaml` 生成各服务 Pipeline
+1. **环境级基础设施**：部署 `infra-{env}` Pipeline
+   - 创建 VPC 网络栈（`network-stack`）
+   - 创建 Cloud Map Namespace（`sd-namespace-shared`）
+2. **服务级基础设施**：部署 `bootstrap-{service}-{env}` Pipeline
+   - 创建 Cloud Map Service（`sd-service-shared-{service}-{env}`）
+   - 创建 LogGroup（`log-shared-{service}-{env}`）
+   - 创建 ALB 栈（`alb-shared-{service}-{env}`）
+3. **应用 Pipeline**：部署 `{service}-{env}` Pipeline
+   - 支持多泳道并行部署
 
 #### 9.1.2 配置管理
 - **环境变量**：通过 SSM Parameter Store 管理共享配置
@@ -477,7 +691,26 @@ Pipeline 配置 → 触发变量 → CodeBuild 环境 → 部署参数文件 →
 
 ## 结论
 
-本方案通过分层架构设计、动态泳道管理和共享基础设施解耦，构建了一套高并发、零冲突的多泳道 ECS 持续交付系统。系统具备完整的并行部署能力、智能流量路由机制和全面的运维保障体系，能够满足现代微服务架构下的复杂部署需求。
+本方案通过双仓架构设计、三层 Pipeline 架构设计、动态泳道管理和分层基础设施解耦，构建了一套高并发、零冲突的多泳道 ECS 持续交付系统。系统具备完整的并行部署能力、智能流量路由机制和全面的运维保障体系，能够满足现代微服务架构下的复杂部署需求。
+
+### 架构优势总结
+
+#### 双仓架构优势
+- **模板统一治理**：所有服务使用统一的 buildspec 和 CloudFormation 模板
+- **DevOps 集中管理**：模板升级、合规检查、版本控制集中化
+- **业务代码独立**：各服务仓专注业务逻辑，可独立开发和部署
+- **低运维成本**：无需逐仓维护 CI/CD 模板，大幅降低运维复杂度
+
+#### 分层 Pipeline 架构优势
+- **职责清晰**：环境级、服务级、应用级 Pipeline 职责明确分离
+- **并发无锁**：不同层级 Pipeline 独立运行，避免资源锁冲突
+- **扩展性强**：新增服务或泳道无需修改现有 Pipeline
+- **维护简单**：每层 Pipeline 独立维护，降低复杂度
+
+#### 资源管理优势
+- **环境级共享**：VPC、Cloud Map Namespace 等环境级资源统一管理
+- **服务级隔离**：Cloud Map Service、LogGroup、ALB 按服务隔离
+- **应用级并发**：Task Definition、ECS Service 按泳道并发部署
 
 **核心价值**：在保证系统稳定性的前提下，实现了部署效率的最大化和运维成本的显著降低，为业务快速迭代和风险控制提供了强有力的技术支撑。
 

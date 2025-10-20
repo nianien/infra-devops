@@ -1,0 +1,298 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Network Stack (Create-or-Reuse by VpcId): VPC + Subnets (+ optional NAT) with stable exports'
+
+Parameters:
+  Env:
+    Type: String
+    Default: dev
+    Description: Environment name tag
+
+  # =============== Reuse trigger ===============
+  # 留空 => 自建；非空 => 复用
+  VpcId:
+    Type: String
+    Default: ''
+    Description: 'Existing VPC ID; leave empty to create a new VPC'
+
+  PublicSubnets:
+    Type: CommaDelimitedList
+    Default: ''
+    Description: 'Existing public subnet IDs when reusing (comma separated)'
+
+  PrivateSubnets:
+    Type: CommaDelimitedList
+    Default: ''
+    Description: 'Existing private subnet IDs when reusing (comma separated)'
+
+  # =============== Create-mode only ===============
+  VpcCidr:
+    Type: String
+    Default: '10.0.0.0/16'
+    Description: 'VPC CIDR block (create mode)'
+
+  PublicSubnetCidr1:
+    Type: String
+    Default: '10.0.1.0/24'
+
+  PublicSubnetCidr2:
+    Type: String
+    Default: '10.0.2.0/24'
+
+  PrivateSubnetCidr1:
+    Type: String
+    Default: '10.0.11.0/24'
+
+  PrivateSubnetCidr2:
+    Type: String
+    Default: '10.0.12.0/24'
+
+  # NAT 策略（仅自建模式有效）
+  CreateNatGateways:
+    Type: String
+    AllowedValues: [ 'none', 'single', 'ha' ]
+    Default: 'single'
+    Description: "NAT strategy when creating VPC: 'none' | 'single' (cost-opt) | 'ha' (per-AZ)"
+
+Conditions:
+  CreateVpc:        !Equals [ !Ref VpcId, '' ]
+  ReuseVpc:         !Not    [ !Equals [ !Ref VpcId, '' ] ]
+
+  NatNone:          !Equals [ !Ref CreateNatGateways, 'none'  ]
+  NatSingle:        !Equals [ !Ref CreateNatGateways, 'single']
+  NatHA:            !Equals [ !Ref CreateNatGateways, 'ha'    ]
+
+Resources:
+  # ===================== CREATE MODE =====================
+  VPC:
+    Type: AWS::EC2::VPC
+    Condition: CreateVpc
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - { Key: Name,        Value: !Sub '${Env}-vpc' }
+        - { Key: Environment, Value: !Ref Env }
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Condition: CreateVpc
+    Properties:
+      Tags:
+        - { Key: Name,        Value: !Sub '${Env}-igw' }
+        - { Key: Environment, Value: !Ref Env }
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Condition: CreateVpc
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Condition: CreateVpc
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: !Ref PublicSubnetCidr1
+      MapPublicIpOnLaunch: true
+      Tags:
+        - { Key: Name,        Value: !Sub '${Env}-public-1' }
+        - { Key: Environment, Value: !Ref Env }
+        - { Key: Type,        Value: Public }
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Condition: CreateVpc
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      CidrBlock: !Ref PublicSubnetCidr2
+      MapPublicIpOnLaunch: true
+      Tags:
+        - { Key: Name,        Value: !Sub '${Env}-public-2' }
+        - { Key: Environment, Value: !Ref Env }
+        - { Key: Type,        Value: Public }
+
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Condition: CreateVpc
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: !Ref PrivateSubnetCidr1
+      Tags:
+        - { Key: Name,        Value: !Sub '${Env}-private-1' }
+        - { Key: Environment, Value: !Ref Env }
+        - { Key: Type,        Value: Private }
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Condition: CreateVpc
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      CidrBlock: !Ref PrivateSubnetCidr2
+      Tags:
+        - { Key: Name,        Value: !Sub '${Env}-private-2' }
+        - { Key: Environment, Value: !Ref Env }
+        - { Key: Type,        Value: Private }
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Condition: CreateVpc
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - { Key: Name,        Value: !Sub '${Env}-public-rt' }
+        - { Key: Environment, Value: !Ref Env }
+
+  DefaultPublicRoute:
+    Type: AWS::EC2::Route
+    Condition: CreateVpc
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Condition: CreateVpc
+    Properties:
+      SubnetId: !Ref PublicSubnet1
+      RouteTableId: !Ref PublicRouteTable
+
+  PublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Condition: CreateVpc
+    Properties:
+      SubnetId: !Ref PublicSubnet2
+      RouteTableId: !Ref PublicRouteTable
+
+  PrivateRouteTable1:
+    Type: AWS::EC2::RouteTable
+    Condition: CreateVpc
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - { Key: Name,        Value: !Sub '${Env}-private-rt-1' }
+        - { Key: Environment, Value: !Ref Env }
+
+  PrivateRouteTable2:
+    Type: AWS::EC2::RouteTable
+    Condition: CreateVpc
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - { Key: Name,        Value: !Sub '${Env}-private-rt-2' }
+        - { Key: Environment, Value: !Ref Env }
+
+  PrivateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Condition: CreateVpc
+    Properties:
+      SubnetId: !Ref PrivateSubnet1
+      RouteTableId: !Ref PrivateRouteTable1
+
+  PrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Condition: CreateVpc
+    Properties:
+      SubnetId: !Ref PrivateSubnet2
+      RouteTableId: !Ref PrivateRouteTable2
+
+  # -------- NAT (create-mode only) --------
+  NatEip1:
+    Type: AWS::EC2::EIP
+    Condition: !And [ CreateVpc, !Or [ NatNone, NatHA ] ]  # for single & ha
+    Properties:
+      Domain: vpc
+
+  NatEip2:
+    Type: AWS::EC2::EIP
+    Condition: !And [ CreateVpc, NatHA ]
+    Properties:
+      Domain: vpc
+
+  NatGatewaySingle:
+    Type: AWS::EC2::NatGateway
+    Condition: !And [ CreateVpc, NatSingle ]
+    Properties:
+      SubnetId: !Ref PublicSubnet1
+      AllocationId: !GetAtt NatEip1.AllocationId
+      Tags:
+        - { Key: Name, Value: !Sub '${Env}-natgw-1' }
+
+  NatGatewayHA1:
+    Type: AWS::EC2::NatGateway
+    Condition: !And [ CreateVpc, NatHA ]
+    Properties:
+      SubnetId: !Ref PublicSubnet1
+      AllocationId: !GetAtt NatEip1.AllocationId
+      Tags:
+        - { Key: Name, Value: !Sub '${Env}-natgw-1' }
+
+  NatGatewayHA2:
+    Type: AWS::EC2::NATGateway
+    Condition: !And [ CreateVpc, NatHA ]
+    Properties:
+      SubnetId: !Ref PublicSubnet2
+      AllocationId: !GetAtt NatEip2.AllocationId
+      Tags:
+        - { Key: Name, Value: !Sub '${Env}-natgw-2' }
+
+  PrivateDefaultRoute1:
+    Type: AWS::EC2::Route
+    Condition: !And [ CreateVpc, !NatNone ]
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable1
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !If
+        - NatHA
+        - !Ref NatGatewayHA1
+        - !Ref NatGatewaySingle
+
+  PrivateDefaultRoute2:
+    Type: AWS::EC2::Route
+    Condition: !And [ CreateVpc, !NatNone ]
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable2
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !If
+        - NatHA
+        - !Ref NatGatewayHA2
+        - !Ref NatGatewaySingle
+
+Outputs:
+  VpcId:
+    Description: 'VPC ID (created or reused)'
+    Value: !If [ CreateVpc, !Ref VPC, !Ref VpcId ]
+    Export:
+      Name: !Sub '${AWS::StackName}-VpcId'
+
+  PublicSubnets:
+    Description: 'Public subnet IDs (created or reused)'
+    Value: !If
+      - CreateVpc
+      - !Join [ ',', [ !Ref PublicSubnet1, !Ref PublicSubnet2 ] ]
+      - !Join [ ',', !Ref PublicSubnets ]
+    Export:
+      Name: !Sub '${AWS::StackName}-PublicSubnets'
+
+  PrivateSubnets:
+    Description: 'Private subnet IDs (created or reused)'
+    Value: !If
+      - CreateVpc
+      - !Join [ ',', [ !Ref PrivateSubnet1, !Ref PrivateSubnet2 ] ]
+      - !Join [ ',', !Ref PrivateSubnets ]
+    Export:
+      Name: !Sub '${AWS::StackName}-PrivateSubnets'
+
+  InternetGatewayId:
+    Condition: CreateVpc
+    Description: 'Internet Gateway ID (create mode only)'
+    Value: !Ref InternetGateway
+    Export:
+      Name: !Sub '${AWS::StackName}-InternetGatewayId'

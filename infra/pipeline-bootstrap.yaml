@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'Infrastructure Pipeline: Deploy environment-level shared infrastructure (Network, Cloud Map Namespace)'
+Description: 'Service Bootstrap Pipeline: Deploy service-level shared infrastructure (Cloud Map Service, LogGroup, ALB)'
 
 Parameters:
   # =========================================================
@@ -7,13 +7,9 @@ Parameters:
   # =========================================================
   PipelineName:
     Type: String
-    Description: 'Infrastructure Pipeline name (format: infra-<env>)'
+    Default: 'service-bootstrap'
+    Description: 'Service Bootstrap Pipeline name'
 
-  Env:
-    Type: String
-    Default: 'dev'
-    AllowedValues: [ dev, test, preonline, online ]
-    Description: 'Environment name'
 
   # =========================================================
   # Optional Parameters
@@ -36,57 +32,6 @@ Parameters:
     Type: String
     Description: 'IAM Role ARN for CodePipeline'
 
-  # =========================================================
-  # Network Parameters
-  # =========================================================
-  # VPC 复用配置（留空则自建，非空则复用现有 VPC）
-  VpcId:
-    Type: String
-    Default: ''
-    Description: 'Existing VPC ID; leave empty to create a new VPC'
-
-  PublicSubnets:
-    Type: CommaDelimitedList
-    Default: ''
-    Description: 'Existing public subnet IDs when reusing (comma separated)'
-
-  PrivateSubnets:
-    Type: CommaDelimitedList
-    Default: ''
-    Description: 'Existing private subnet IDs when reusing (comma separated)'
-
-  # VPC 创建配置（仅在 VpcId 为空时有效）
-  VpcCidr:
-    Type: String
-    Default: '10.0.0.0/16'
-    Description: 'VPC CIDR block (create mode only)'
-
-  PublicSubnetCidr1:
-    Type: String
-    Default: '10.0.1.0/24'
-    Description: 'Public subnet 1 CIDR block (create mode only)'
-
-  PublicSubnetCidr2:
-    Type: String
-    Default: '10.0.2.0/24'
-    Description: 'Public subnet 2 CIDR block (create mode only)'
-
-  PrivateSubnetCidr1:
-    Type: String
-    Default: '10.0.11.0/24'
-    Description: 'Private subnet 1 CIDR block (create mode only)'
-
-  PrivateSubnetCidr2:
-    Type: String
-    Default: '10.0.12.0/24'
-    Description: 'Private subnet 2 CIDR block (create mode only)'
-
-  CreateNatGateways:
-    Type: String
-    AllowedValues: [ 'none', 'single', 'ha' ]
-    Default: 'single'
-    Description: "NAT strategy when creating VPC: 'none' | 'single' (cost-opt) | 'ha' (per-AZ)"
-
 Resources:
   Pipeline:
     Type: AWS::CodePipeline::Pipeline
@@ -96,6 +41,14 @@ Resources:
       ArtifactStore:
         Type: S3
         Location: !Ref ArtifactBucketName
+
+      Variables:
+        - Name: Service
+          DefaultValue: ''
+          Description: 'ECS service name (e.g. demo-rpc or demo-api)'
+        - Name: Env
+          DefaultValue: 'dev'
+          Description: 'Environment name'
 
       Stages:
         - Name: Source
@@ -115,9 +68,9 @@ Resources:
               OutputArtifacts:
                 - Name: InfraOut
 
-        - Name: DeployNetwork
+        - Name: DeployServiceDiscovery
           Actions:
-            - Name: CFNDeployNetwork
+            - Name: CFNDeployServiceDiscovery
               ActionTypeId:
                 Category: Deploy
                 Owner: AWS
@@ -127,27 +80,20 @@ Resources:
                 - Name: InfraOut
               Configuration:
                 ActionMode: CREATE_UPDATE
-                StackName: 'network-stack'
-                TemplatePath: 'InfraOut::ci/vpc-stack.yaml'
+                StackName: !Sub 'sd-service-#{variables.Service}-#{variables.Env}'
+                TemplatePath: 'InfraOut::ci/sd-stack.yaml'
                 RoleArn: !Ref CloudFormationDeployRoleArn
                 Capabilities: 'CAPABILITY_IAM,CAPABILITY_NAMED_IAM'
                 ParameterOverrides: !Sub |
                   {
-                    "Env": "${Env}",
-                    "VpcId": "${VpcId}",
-                    "PublicSubnets": "${PublicSubnets}",
-                    "PrivateSubnets": "${PrivateSubnets}",
-                    "VpcCidr": "${VpcCidr}",
-                    "PublicSubnetCidr1": "${PublicSubnetCidr1}",
-                    "PublicSubnetCidr2": "${PublicSubnetCidr2}",
-                    "PrivateSubnetCidr1": "${PrivateSubnetCidr1}",
-                    "PrivateSubnetCidr2": "${PrivateSubnetCidr2}",
-                    "CreateNatGateways": "${CreateNatGateways}"
+                    "ServiceName": "#{variables.Service}",
+                    "Env": "#{variables.Env}",
+                    "NamespaceStackName": "sd-namespace-shared"
                   }
 
-        - Name: DeployNamespace
+        - Name: DeployLog
           Actions:
-            - Name: CFNDeployNamespace
+            - Name: CFNDeployLog
               ActionTypeId:
                 Category: Deploy
                 Owner: AWS
@@ -157,18 +103,59 @@ Resources:
                 - Name: InfraOut
               Configuration:
                 ActionMode: CREATE_UPDATE
-                StackName: 'sd-namespace-shared'
-                TemplatePath: 'InfraOut::ci/namespace-stack.yaml'
+                StackName: !Sub 'log-#{variables.Service}-#{variables.Env}'
+                TemplatePath: 'InfraOut::ci/log-stack.yaml'
                 RoleArn: !Ref CloudFormationDeployRoleArn
                 Capabilities: 'CAPABILITY_IAM,CAPABILITY_NAMED_IAM'
                 ParameterOverrides: !Sub |
                   {
-                    "Env": "${Env}"
+                    "ServiceName": "#{variables.Service}",
+                    "Env": "#{variables.Env}"
                   }
 
+        - Name: DeployAlb
+          Actions:
+            - Name: CFNDeployAlb
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CloudFormation
+                Version: '1'
+              InputArtifacts:
+                - Name: InfraOut
+              Configuration:
+                ActionMode: CREATE_UPDATE
+                StackName: !Sub 'alb-#{variables.Service}-#{variables.Env}'
+                TemplatePath: 'InfraOut::ci/alb-stack.yaml'
+                RoleArn: !Ref CloudFormationDeployRoleArn
+                Capabilities: 'CAPABILITY_IAM,CAPABILITY_NAMED_IAM'
+                ParameterOverrides: !Sub |
+                  {
+                    "ServiceName": "#{variables.Service}",
+                    "Env": "#{variables.Env}"
+                  }
 
       RestartExecutionOnUpdate: true
 
 Outputs:
   PipelineNameOut:
     Value: !Ref PipelineName
+    Description: 'Service Bootstrap Pipeline Name'
+  
+  ServiceDiscoveryStackName:
+    Value: !Sub 'sd-service-#{variables.Service}-#{variables.Env}'
+    Description: 'Cloud Map Service Stack Name'
+    Export:
+      Name: !Sub '${AWS::StackName}-ServiceDiscoveryStack'
+  
+  LogGroupStackName:
+    Value: !Sub 'log-#{variables.Service}-#{variables.Env}'
+    Description: 'LogGroup Stack Name'
+    Export:
+      Name: !Sub '${AWS::StackName}-LogGroupStack'
+  
+  AlbStackName:
+    Value: !Sub 'alb-#{variables.Service}-#{variables.Env}'
+    Description: 'ALB Stack Name'
+    Export:
+      Name: !Sub '${AWS::StackName}-AlbStack'
