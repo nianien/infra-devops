@@ -110,7 +110,7 @@ Resources:
   Pipeline:
     Type: AWS::CodePipeline::Pipeline
     Properties:
-      Name: !Ref PipelineName
+      Name: !Sub '${PipelineName}-${Env}'
       RoleArn: !Ref CodePipelineRoleArn
       ArtifactStore:
         Type: S3
