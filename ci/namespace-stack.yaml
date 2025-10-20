@@ -14,7 +14,7 @@ Resources:
     Type: AWS::ServiceDiscovery::PrivateDnsNamespace
     Properties:
       Name: !Sub '${Env}.local'
-      Vpc: !ImportValue 'network-stack-VpcId'
+      Vpc: !ImportValue 'infra-network-VpcId'
       Description: !Sub 'Private DNS namespace for ${Env} environment'
       Tags:
         - Key: Name

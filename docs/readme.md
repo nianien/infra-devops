@@ -153,12 +153,13 @@ Infra 仓提供构建逻辑模板，业务仓只提供代码。所有服务共�
 | 资源类型 | 命名模式 | 示例 | 说明 |
 |---------|---------|------|------|
 | **环境级共享** | | | |
-| VPC Stack | `network-stack` | `network-stack` | 网络基础设施栈 |
+| VPC Stack | `infra-network` | `infra-network` | 网络基础设施栈 |
+| Cloud Map Namespace | `infra-namespace` | `infra-namespace` | 服务发现命名空间栈 |
 | Cloud Map Namespace | `{env}.local` | `dev.local` | 服务发现命名空间 |
 | **服务级共享** | | | |
-| Cloud Map Service Stack | `sd-service-shared-{service}-{env}` | `sd-service-shared-user-api-dev` | 服务发现栈 |
-| LogGroup Stack | `log-shared-{service}-{env}` | `log-shared-user-api-dev` | 日志组栈 |
-| ALB Stack | `alb-shared-{service}-{env}` | `alb-shared-user-api-dev` | 负载均衡栈 |
+| Cloud Map Service Stack | `boot-sd-{service}-{env}` | `boot-sd-user-api-dev` | 服务发现栈 |
+| LogGroup Stack | `boot-log-{service}-{env}` | `boot-log-user-api-dev` | 日志组栈 |
+| ALB Stack | `boot-alb-{service}-{env}` | `boot-alb-user-api-dev` | 负载均衡栈 |
 | Application Load Balancer | `{service}-{env}-alb` | `user-api-dev-alb` | 负载均衡器 |
 | Cloud Map Service | `{service}` | `user-api` | 服务发现服务 |
 | Log Group | `/ecs/{env}/{service}` | `/ecs/dev/user-api` | 日志组 |
@@ -182,18 +183,18 @@ Infra 仓提供构建逻辑模板，业务仓只提供代码。所有服务共�
 - **命名规范**：`infra-{env}`
 - **部署频率**：环境初始化时运行一次，后续很少变更
 - **部署资源**：
-  - VPC 网络栈（`network-stack`）
-  - Cloud Map Namespace（`sd-namespace-shared`）
+  - VPC 网络栈（`infra-network`）
+  - Cloud Map Namespace（`infra-namespace`）
 - **特点**：环境级资源，所有服务共享，避免并发更新冲突
 
 #### 3.1.2 Bootstrap Pipeline（服务级引导）
-- **模板文件**：`pipeline-bootstrap.yaml`
+- **模板文件**：`pipeline-boot.yaml`
 - **命名规范**：`bootstrap-{service}-{env}`
 - **部署频率**：新服务接入或服务级基础设施变更时运行
 - **部署资源**：
-  - Cloud Map Service（`sd-service-shared-{service}-{env}`）
-  - LogGroup（`log-shared-{service}-{env}`）
-  - ALB 栈（`alb-shared-{service}-{env}`）
+  - Cloud Map Service（`boot-sd-{service}-{env}`）
+  - LogGroup（`boot-log-{service}-{env}`）
+  - ALB 栈（`boot-alb-{service}-{env}`）
 - **特点**：服务级资源，按服务隔离，支持并行部署
 
 #### 3.1.3 App Pipeline（应用部署）
@@ -235,7 +236,7 @@ App Pipeline (应用级)
 共享层负责提供基础网络、负载均衡、服务发现和日志聚合能力，采用只读引用模式，避免业务发布时的并发冲突。
 
 #### 4.1.1 VPC 网络栈
-- **栈名称**：`network-stack`
+- **栈名称**：`infra-network`
 - **职责**：包装现有 VPC 资源，提供网络基础设施
 - **导出资源**：
   - `VpcId`：VPC 标识符
@@ -245,7 +246,7 @@ App Pipeline (应用级)
 - **使用方**：Bootstrap Pipeline、App Pipeline（通过 ImportValue 引用）
 
 #### 4.1.2 Cloud Map Namespace 栈
-- **栈名称**：`sd-namespace-shared`
+- **栈名称**：`infra-namespace`
 - **创建资源**：Cloud Map Private DNS Namespace `{env}.local`
 - **导出资源**：`NamespaceId`
 - **使用方**：Bootstrap Pipeline（通过 ImportValue 引用）
@@ -253,13 +254,13 @@ App Pipeline (应用级)
 ### 4.2 服务级共享基础设施层
 
 #### 4.2.1 Cloud Map Service 栈
-- **栈名称**：`sd-service-shared-{service}-{env}`
+- **栈名称**：`boot-sd-{service}-{env}`
 - **创建资源**：Cloud Map Service `{service}`
 - **导出资源**：`SdServiceId`
 - **使用方**：App Pipeline（通过 ImportValue 引用）
 
 #### 4.2.2 负载均衡栈
-- **栈名称**：`alb-shared-{service}-{env}`
+- **栈名称**：`boot-alb-{service}-{env}`
 - **创建资源**：
   - Application Load Balancer：`{service}-{env}-alb`
   - HTTP Listener：端口 80
@@ -271,7 +272,7 @@ App Pipeline (应用级)
 - **使用方**：App Pipeline（通过 ImportValue 引用）
 
 #### 4.2.3 日志聚合栈
-- **栈名称**：`log-shared-{service}-{env}`
+- **栈名称**：`boot-log-{service}-{env}`
 - **创建资源**：CloudWatch Log Group `/ecs/{env}/{service}`
 - **配置**：日志保留期 30 天
 - **导出资源**：`LogGroupName`
@@ -439,7 +440,7 @@ Pipeline 配置 → 触发变量 → CodeBuild 环境 → 部署参数文件 →
 ### 6.1 VPC 网络共享
 
 #### 6.1.1 设计原则
-- **包装模式**：`network-stack` 仅包装现有 VPC 资源，不进行网络资源创建
+- **包装模式**：`infra-network` 仅包装现有 VPC 资源，不进行网络资源创建
 - **只读引用**：业务发布过程中不修改网络配置，确保零风险
 - **统一管理**：所有业务共享统一的网络基础设施
 
@@ -551,10 +552,10 @@ Pipeline 配置 → 触发变量 → CodeBuild 环境 → 部署参数文件 →
       "Effect": "Deny",
       "Action": "cloudformation:*",
       "Resource": [
-        "arn:aws:cloudformation:*:*:stack/alb-shared-*/*",
-        "arn:aws:cloudformation:*:*:stack/sd-*/*",
-        "arn:aws:cloudformation:*:*:stack/log-shared-*/*",
-        "arn:aws:cloudformation:*:*:stack/network-stack/*"
+        "arn:aws:cloudformation:*:*:stack/boot-alb-*/*",
+        "arn:aws:cloudformation:*:*:stack/boot-sd-*/*",
+        "arn:aws:cloudformation:*:*:stack/boot-log-*/*",
+        "arn:aws:cloudformation:*:*:stack/infra-network/*"
       ]
     }
   ]
@@ -572,16 +573,16 @@ Pipeline 配置 → 触发变量 → CodeBuild 环境 → 部署参数文件 →
 #### 8.1.1 环境级基础设施部署
 1. **部署 Infra Pipeline**：`infra-{env}`
 2. **创建环境级资源**：
-   - VPC 网络栈（`network-stack`）
-   - Cloud Map Namespace（`sd-namespace-shared`）
+   - VPC 网络栈（`infra-network`）
+   - Cloud Map Namespace（`infra-namespace`）
 3. **导出环境级资源**：供后续 Pipeline 引用
 
 #### 8.1.2 服务级基础设施部署
 1. **部署 Bootstrap Pipeline**：`bootstrap-{service}-{env}`
 2. **创建服务级资源**：
-   - Cloud Map Service（`sd-service-shared-{service}-{env}`）
-   - LogGroup（`log-shared-{service}-{env}`）
-   - ALB 栈（`alb-shared-{service}-{env}`）
+   - Cloud Map Service（`boot-sd-{service}-{env}`）
+   - LogGroup（`boot-log-{service}-{env}`）
+   - ALB 栈（`boot-alb-{service}-{env}`）
 3. **导出服务级资源**：供 App Pipeline 引用
 
 ### 8.2 标准发布流程
@@ -614,12 +615,12 @@ Pipeline 配置 → 触发变量 → CodeBuild 环境 → 部署参数文件 →
 
 #### 9.1.1 基础设施部署顺序
 1. **环境级基础设施**：部署 `infra-{env}` Pipeline
-   - 创建 VPC 网络栈（`network-stack`）
-   - 创建 Cloud Map Namespace（`sd-namespace-shared`）
+   - 创建 VPC 网络栈（`infra-network`）
+   - 创建 Cloud Map Namespace（`infra-namespace`）
 2. **服务级基础设施**：部署 `bootstrap-{service}-{env}` Pipeline
-   - 创建 Cloud Map Service（`sd-service-shared-{service}-{env}`）
-   - 创建 LogGroup（`log-shared-{service}-{env}`）
-   - 创建 ALB 栈（`alb-shared-{service}-{env}`）
+   - 创建 Cloud Map Service（`boot-sd-{service}-{env}`）
+   - 创建 LogGroup（`boot-log-{service}-{env}`）
+   - 创建 ALB 栈（`boot-alb-{service}-{env}`）
 3. **应用 Pipeline**：部署 `{service}-{env}` Pipeline
    - 支持多泳道并行部署
 

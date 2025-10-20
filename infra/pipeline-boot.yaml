@@ -32,6 +32,11 @@ Parameters:
     Type: String
     Description: 'IAM Role ARN for CodePipeline'
 
+  FullRepositoryId:
+    Type: String
+    Default: 'nianien/infra-devops'
+    Description: 'GitHub repository ID (format: owner/repository)'
+
 Resources:
   Pipeline:
     Type: AWS::CodePipeline::Pipeline
@@ -45,7 +50,7 @@ Resources:
       Variables:
         - Name: Service
           DefaultValue: ''
-          Description: 'ECS service name (e.g. demo-rpc or demo-api)'
+          Description: 'ECS service name (e.g. demo-rpc or demo-api). Use lowercase letters, numbers, and hyphens only.'
         - Name: Env
           DefaultValue: 'dev'
           Description: 'Environment name'
@@ -61,7 +66,7 @@ Resources:
                 Version: '1'
               Configuration:
                 ConnectionArn: !Ref ConnectionArn
-                FullRepositoryId: 'nianien/infra-devops'
+                FullRepositoryId: !Ref FullRepositoryId
                 BranchName: 'master'
                 OutputArtifactFormat: CODE_ZIP
                 DetectChanges: false
@@ -80,7 +85,7 @@ Resources:
                 - Name: InfraOut
               Configuration:
                 ActionMode: CREATE_UPDATE
-                StackName: !Sub 'sd-service-#{variables.Service}-#{variables.Env}'
+                StackName: !Sub 'boot-sd-#{variables.Service}-#{variables.Env}'
                 TemplatePath: 'InfraOut::ci/sd-stack.yaml'
                 RoleArn: !Ref CloudFormationDeployRoleArn
                 Capabilities: 'CAPABILITY_IAM,CAPABILITY_NAMED_IAM'
@@ -88,7 +93,7 @@ Resources:
                   {
                     "ServiceName": "#{variables.Service}",
                     "Env": "#{variables.Env}",
-                    "NamespaceStackName": "sd-namespace-shared"
+                    "NamespaceStackName": "infra-namespace"
                   }
 
         - Name: DeployLog
@@ -103,7 +108,7 @@ Resources:
                 - Name: InfraOut
               Configuration:
                 ActionMode: CREATE_UPDATE
-                StackName: !Sub 'log-#{variables.Service}-#{variables.Env}'
+                StackName: !Sub 'boot-log-#{variables.Service}-#{variables.Env}'
                 TemplatePath: 'InfraOut::ci/log-stack.yaml'
                 RoleArn: !Ref CloudFormationDeployRoleArn
                 Capabilities: 'CAPABILITY_IAM,CAPABILITY_NAMED_IAM'
@@ -125,7 +130,7 @@ Resources:
                 - Name: InfraOut
               Configuration:
                 ActionMode: CREATE_UPDATE
-                StackName: !Sub 'alb-#{variables.Service}-#{variables.Env}'
+                StackName: !Sub 'boot-alb-#{variables.Service}-#{variables.Env}'
                 TemplatePath: 'InfraOut::ci/alb-stack.yaml'
                 RoleArn: !Ref CloudFormationDeployRoleArn
                 Capabilities: 'CAPABILITY_IAM,CAPABILITY_NAMED_IAM'
@@ -141,21 +146,3 @@ Outputs:
   PipelineNameOut:
     Value: !Ref PipelineName
     Description: 'Service Bootstrap Pipeline Name'
-  
-  ServiceDiscoveryStackName:
-    Value: !Sub 'sd-service-#{variables.Service}-#{variables.Env}'
-    Description: 'Cloud Map Service Stack Name'
-    Export:
-      Name: !Sub '${AWS::StackName}-ServiceDiscoveryStack'
-  
-  LogGroupStackName:
-    Value: !Sub 'log-#{variables.Service}-#{variables.Env}'
-    Description: 'LogGroup Stack Name'
-    Export:
-      Name: !Sub '${AWS::StackName}-LogGroupStack'
-  
-  AlbStackName:
-    Value: !Sub 'alb-#{variables.Service}-#{variables.Env}'
-    Description: 'ALB Stack Name'
-    Export:
-      Name: !Sub '${AWS::StackName}-AlbStack'

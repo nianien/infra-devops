@@ -61,7 +61,7 @@ Resources:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
       Name: !Sub '${ServiceName}-${Env}-${Lane}-tg'
-      VpcId: !ImportValue 'network-stack-VpcId'
+      VpcId: !ImportValue 'infra-network-VpcId'
       TargetType: ip
       Protocol: HTTP
       Port: !Ref WebServerPort
@@ -77,7 +77,7 @@ Resources:
     Type: AWS::ElasticLoadBalancingV2::ListenerRule
     Condition: !Not [ !Condition LaneAsDefault ]
     Properties:
-      ListenerArn: !ImportValue 'alb-shared-${ServiceName}-${Env}-HttpListenerArn'
+      ListenerArn: !ImportValue 'boot-alb-${ServiceName}-${Env}-HttpListenerArn'
       Priority: 100
       RuleName: !Sub '${ServiceName}-${Env}-${Lane}-rule'
       Conditions:
@@ -130,7 +130,7 @@ Resources:
           LogConfiguration:
             LogDriver: awslogs
             Options:
-              awslogs-group: !ImportValue 'log-shared-${ServiceName}-${Env}-LogGroupName'
+              awslogs-group: !ImportValue 'boot-log-${ServiceName}-${Env}-LogGroupName'
               awslogs-region: !Ref AWS::Region
               awslogs-stream-prefix: !If
                 - LaneAsDefault
@@ -156,12 +156,12 @@ Resources:
         MinimumHealthyPercent: 100
       NetworkConfiguration:
         AwsvpcConfiguration:
-          Subnets: !ImportValue 'network-stack-PrivateSubnets'
+          Subnets: !ImportValue 'infra-network-PrivateSubnets'
           SecurityGroups: !Ref AWS::NoValue
           AssignPublicIp: ENABLED
       ServiceRegistries:
         - RegistryArn: !ImportValue
-            Fn::Sub: 'sd-service-shared-${ServiceName}-${ServiceName}-service-arn'
+            Fn::Sub: 'boot-sd-${ServiceName}-${Env}-service-arn'
           ContainerName: !Ref ServiceName
           ContainerPort: !Ref RpcServerPort
       EnableECSManagedTags: true
@@ -188,7 +188,7 @@ Outputs:
     Value: !Ref TaskDef
   DiscoveryServiceArn:
     Description: 'Cloud Map Service ARN'
-    Value: !ImportValue 'sd-service-shared-${ServiceName}-${ServiceName}-service-arn'
+    Value: !ImportValue 'boot-sd-${ServiceName}-${Env}-service-arn'
   TargetGroupArn:
     Description: 'Lane Target Group ARN'
     Value: !Ref LaneTargetGroup

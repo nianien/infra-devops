@@ -127,7 +127,7 @@ Resources:
                 - Name: InfraOut
               Configuration:
                 ActionMode: CREATE_UPDATE
-                StackName: 'network-stack'
+                StackName: 'infra-network'
                 TemplatePath: 'InfraOut::ci/vpc-stack.yaml'
                 RoleArn: !Ref CloudFormationDeployRoleArn
                 Capabilities: 'CAPABILITY_IAM,CAPABILITY_NAMED_IAM'
@@ -157,7 +157,7 @@ Resources:
                 - Name: InfraOut
               Configuration:
                 ActionMode: CREATE_UPDATE
-                StackName: 'sd-namespace-shared'
+                StackName: 'infra-namespace'
                 TemplatePath: 'InfraOut::ci/namespace-stack.yaml'
                 RoleArn: !Ref CloudFormationDeployRoleArn
                 Capabilities: 'CAPABILITY_IAM,CAPABILITY_NAMED_IAM'

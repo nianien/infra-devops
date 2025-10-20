@@ -27,7 +27,7 @@ Resources:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: !Sub 'ALB SG for ${ServiceName}'
-      VpcId: !ImportValue 'network-stack-VpcId'
+      VpcId: !ImportValue 'infra-network-VpcId'
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 80
@@ -43,7 +43,7 @@ Resources:
       Name: !Sub '${ServiceName}-${Env}-alb'
       Scheme: internet-facing
       Type: application
-      Subnets: !ImportValue 'network-stack-PublicSubnets'
+      Subnets: !ImportValue 'infra-network-PublicSubnets'
       SecurityGroups:
         - !Ref AlbSecurityGroup
 
@@ -51,7 +51,7 @@ Resources:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
       Name: !Sub '${ServiceName}-${Env}-default-tg'
-      VpcId: !ImportValue 'network-stack-VpcId'
+      VpcId: !ImportValue 'infra-network-VpcId'
       TargetType: ip
       Protocol: HTTP
       Port: !Ref HealthCheckPort
