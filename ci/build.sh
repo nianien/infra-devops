@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# 加载上一阶段写入的变量（按构建ID隔离）
-CI_ENV_FILE="/tmp/ci_env_${CODEBUILD_BUILD_ID//:/_}"
-[[ -f "$CI_ENV_FILE" ]] && source "$CI_ENV_FILE"
 
 INFRA_ROOT="${CODEBUILD_SRC_DIR:-.}"
 APP_ROOT="${CODEBUILD_SRC_DIR_AppOut:-$INFRA_ROOT}"
@@ -36,4 +33,4 @@ docker tag "$IMAGE_TAG_URI" "$ECR_REPO_URI:latest"
 docker push "$ECR_REPO_URI:latest"
 
 # 给 post_build 用
-echo "export IMAGE_TAG_URI=$IMAGE_TAG_URI" | tee -a "$CI_ENV_FILE"
+export IMAGE_TAG_URI

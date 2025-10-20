@@ -10,7 +10,7 @@ echo "BRANCH=${BRANCH:-}"
 
 # --- 目录就绪性 ---
 SRC_DIR="${CODEBUILD_SRC_DIR:-}"
-APP_OUT_DIR=APP_OUT_DIR="${CODEBUILD_SRC_DIR_AppOut}"
+APP_OUT_DIR="${CODEBUILD_SRC_DIR_AppOut}"
 
 if [[ -z "$SRC_DIR" || ! -d "$SRC_DIR" ]]; then
   echo "[FATAL] Primary source dir not found: CODEBUILD_SRC_DIR='${SRC_DIR:-<empty>}'"
@@ -71,12 +71,5 @@ aws ecr get-login-password --region "$AWS_REGION" \
 
 echo "==> IMAGE_TAG=$IMAGE_TAG"
 echo "==> ECR_REPO_URI=$ECR_REPO_URI"
-
-# --- 跨阶段共享（写成可 source 的形式） ---
-CI_ENV_FILE="/tmp/ci_env_${CODEBUILD_BUILD_ID//:/_}"
-{
-  echo "export ECR_REPO_URI=${ECR_REPO_URI}"
-  echo "export IMAGE_TAG=${IMAGE_TAG}"
-} | tee -a "$CI_ENV_FILE"
 
 echo "Prebuild OK (no extra git operations)."
