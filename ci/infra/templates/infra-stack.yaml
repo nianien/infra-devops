@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'Network Stack: VPC + Subnets + NAT Gateway with stable exports'
+Description: 'Complete Environment Infrastructure: VPC + Cloud Map Namespace + ECS Cluster'
 
 Parameters:
   Env:
@@ -210,7 +210,41 @@ Resources:
       DestinationCidrBlock: 0.0.0.0/0
       NatGatewayId: !Ref NatGateway2
 
+  # ===================== CLOUD MAP NAMESPACE =====================
+  PrivateDnsNamespace:
+    Type: AWS::ServiceDiscovery::PrivateDnsNamespace
+    Properties:
+      Name: !Sub '${Env}.local'
+      Vpc: !Ref VPC
+      Description: !Sub 'Private DNS namespace for ${Env} environment'
+      Tags:
+        - Key: Name
+          Value: !Sub '${Env}-namespace'
+        - Key: Environment
+          Value: !Ref Env
+
+  # ===================== ECS CLUSTER =====================
+  ECSCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub '${Env}-cluster'
+      CapacityProviders:
+        - FARGATE
+        - FARGATE_SPOT
+      DefaultCapacityProviderStrategy:
+        - CapacityProvider: FARGATE
+          Weight: 1
+      ClusterSettings:
+        - Name: containerInsights
+          Value: enabled
+      Tags:
+        - Key: Name
+          Value: !Sub '${Env}-cluster'
+        - Key: Environment
+          Value: !Ref Env
+
 Outputs:
+  # VPC Outputs
   VpcId:
     Description: 'VPC ID'
     Value: !Ref VPC
@@ -234,3 +268,29 @@ Outputs:
     Value: !Ref InternetGateway
     Export:
       Name: !Sub '${AWS::StackName}-InternetGatewayId'
+
+  # Cloud Map Outputs
+  NamespaceId:
+    Description: 'Cloud Map Namespace ID'
+    Value: !Ref PrivateDnsNamespace
+    Export:
+      Name: !Sub '${AWS::StackName}-namespace-id'
+
+  NamespaceName:
+    Description: 'Cloud Map Namespace Name'
+    Value: !Sub '${Env}.local'
+    Export:
+      Name: !Sub '${AWS::StackName}-namespace-name'
+
+  # ECS Cluster Outputs
+  ClusterName:
+    Description: 'ECS Cluster Name'
+    Value: !Ref ECSCluster
+    Export:
+      Name: !Sub '${AWS::StackName}-ClusterName'
+
+  ClusterArn:
+    Description: 'ECS Cluster ARN'
+    Value: !Ref ECSCluster
+    Export:
+      Name: !Sub '${AWS::StackName}-ClusterArn'

@@ -94,9 +94,9 @@ Resources:
               OutputArtifacts:
                 - Name: InfraOut
 
-        - Name: DeployNetwork
+        - Name: DeployEnvironment
           Actions:
-            - Name: CFNDeployNetwork
+            - Name: CFNDeployEnvironment
               ActionTypeId:
                 Category: Deploy
                 Owner: AWS
@@ -106,8 +106,8 @@ Resources:
                 - Name: InfraOut
               Configuration:
                 ActionMode: CREATE_UPDATE
-                StackName: 'infra-network'
-                TemplatePath: 'InfraOut::ci/infra/templates/vpc-stack.yaml'
+                StackName: 'infra-environment'
+                TemplatePath: 'InfraOut::ci/infra/templates/infra-stack.yaml'
                 RoleArn: !Ref CloudFormationDeployRoleArn
                 Capabilities: 'CAPABILITY_IAM,CAPABILITY_NAMED_IAM'
                 ParameterOverrides: !Sub |
@@ -118,27 +118,6 @@ Resources:
                     "PublicSubnetCidr2": "${PublicSubnetCidr2}",
                     "PrivateSubnetCidr1": "${PrivateSubnetCidr1}",
                     "PrivateSubnetCidr2": "${PrivateSubnetCidr2}"
-                  }
-
-        - Name: DeployNamespace
-          Actions:
-            - Name: CFNDeployNamespace
-              ActionTypeId:
-                Category: Deploy
-                Owner: AWS
-                Provider: CloudFormation
-                Version: '1'
-              InputArtifacts:
-                - Name: InfraOut
-              Configuration:
-                ActionMode: CREATE_UPDATE
-                StackName: 'infra-namespace'
-                TemplatePath: 'InfraOut::ci/infra/templates/namespace-stack.yaml'
-                RoleArn: !Ref CloudFormationDeployRoleArn
-                Capabilities: 'CAPABILITY_IAM,CAPABILITY_NAMED_IAM'
-                ParameterOverrides: !Sub |
-                  {
-                    "Env": "${Env}"
                   }
       RestartExecutionOnUpdate: true
 

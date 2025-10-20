@@ -1,0 +1,199 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Service Bootstrap Stack: ALB + LogGroup + Cloud Map Service (shared infrastructure)'
+
+Parameters:
+  ServiceName:
+    Type: String
+    Description: 'Service name (e.g. user-service)'
+
+  Env:
+    Type: String
+    Default: 'dev'
+    Description: 'Environment name'
+
+  # ALB Parameters
+  HealthCheckPort:
+    Type: Number
+    Default: 8080
+    Description: 'Target group health check port'
+
+  HealthCheckPath:
+    Type: String
+    Default: '/health'
+    Description: 'Target group health check path'
+
+  # Log Parameters
+  LogRetentionDays:
+    Type: Number
+    Default: 30
+    Description: 'Log retention period in days'
+
+  # Service Discovery Parameters
+  DnsRecordType:
+    Type: String
+    Description: 'DNS record type for service discovery'
+    Default: 'SRV'
+    AllowedValues: ['SRV', 'A', 'AAAA']
+
+  DnsTtl:
+    Type: Number
+    Description: 'DNS TTL in seconds'
+    Default: 30
+    MinValue: 5
+    MaxValue: 300
+
+  HealthCheckFailureThreshold:
+    Type: Number
+    Description: 'Health check failure threshold'
+    Default: 1
+    MinValue: 1
+    MaxValue: 10
+
+Resources:
+  # ===================== ALB SECURITY GROUP =====================
+  AlbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub 'ALB SG for ${ServiceName}'
+      VpcId: !ImportValue 'infra-environment-VpcId'
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub '${ServiceName}-alb-sg'
+
+  # ===================== APPLICATION LOAD BALANCER =====================
+  ApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub '${ServiceName}-${Env}-alb'
+      Scheme: internet-facing
+      Type: application
+      Subnets: !Split [ ',', !ImportValue 'infra-environment-PublicSubnets' ]
+      SecurityGroups:
+        - !Ref AlbSecurityGroup
+
+  DefaultTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub '${ServiceName}-${Env}-default-tg'
+      VpcId: !ImportValue 'infra-environment-VpcId'
+      TargetType: ip
+      Protocol: HTTP
+      Port: !Ref HealthCheckPort
+      HealthCheckEnabled: true
+      HealthCheckProtocol: HTTP
+      HealthCheckPath: !Ref HealthCheckPath
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+
+  HttpListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref DefaultTargetGroup
+
+  # ===================== CLOUDWATCH LOG GROUP =====================
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/ecs/${Env}/${ServiceName}'
+      RetentionInDays: !Ref LogRetentionDays
+      Tags:
+        - Key: Name
+          Value: !Sub '/ecs/${Env}/${ServiceName}'
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Service
+          Value: !Ref ServiceName
+
+  # ===================== CLOUD MAP SERVICE =====================
+  ServiceDiscoveryService:
+    Type: AWS::ServiceDiscovery::Service
+    Properties:
+      Name: !Ref ServiceName
+      NamespaceId: !ImportValue 'infra-environment-namespace-id'
+      Description: !Sub 'Cloud Map Service for ${ServiceName}'
+      DnsConfig:
+        DnsRecords:
+          - Type: !Ref DnsRecordType
+            TTL: !Ref DnsTtl
+        RoutingPolicy: MULTIVALUE
+      HealthCheckCustomConfig:
+        FailureThreshold: !Ref HealthCheckFailureThreshold
+      Tags:
+        - Key: Name
+          Value: !Ref ServiceName
+        - Key: Service
+          Value: !Ref ServiceName
+        - Key: Environment
+          Value: !Ref Env
+
+Outputs:
+  # ALB Outputs
+  LoadBalancerArn:
+    Description: 'Application Load Balancer ARN'
+    Value: !Ref ApplicationLoadBalancer
+    Export:
+      Name: !Sub '${AWS::StackName}-LoadBalancerArn'
+
+  LoadBalancerDnsName:
+    Description: 'Application Load Balancer DNS name'
+    Value: !GetAtt ApplicationLoadBalancer.DNSName
+    Export:
+      Name: !Sub '${AWS::StackName}-DnsName'
+
+  HttpListenerArn:
+    Description: 'HTTP Listener ARN'
+    Value: !Ref HttpListener
+    Export:
+      Name: !Sub '${AWS::StackName}-HttpListenerArn'
+
+  DefaultTargetGroupArn:
+    Description: 'Default Target Group ARN'
+    Value: !Ref DefaultTargetGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-DefaultTargetGroupArn'
+
+  # LogGroup Outputs
+  LogGroupName:
+    Description: 'CloudWatch Log Group Name'
+    Value: !Sub '/ecs/${Env}/${ServiceName}'
+    Export:
+      Name: !Sub '${AWS::StackName}-LogGroupName'
+
+  # Service Discovery Outputs
+  SdServiceId:
+    Description: 'Service Discovery Service ID'
+    Value: !Ref ServiceDiscoveryService
+    Export:
+      Name: !Sub '${AWS::StackName}-${ServiceName}-service-id'
+
+  ServiceArn:
+    Description: 'Service Discovery Service ARN'
+    Value: !GetAtt ServiceDiscoveryService.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-${ServiceName}-service-arn'
+
+  ServiceName:
+    Description: 'Service name'
+    Value: !Ref ServiceName
+    Export:
+      Name: !Sub '${AWS::StackName}-${ServiceName}-service-name'
+
+  DnsName:
+    Description: 'DNS name for service discovery'
+    Value: !Sub
+      - '${ServiceName}.${NamespaceName}'
+      - NamespaceName: !ImportValue 'infra-environment-namespace-name'
+    Export:
+      Name: !Sub '${AWS::StackName}-${ServiceName}-dns-name'

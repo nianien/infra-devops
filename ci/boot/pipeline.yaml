@@ -82,9 +82,9 @@ Resources:
               OutputArtifacts:
                 - Name: InfraOut
 
-        - Name: DeployServiceDiscovery
+        - Name: DeployBootstrap
           Actions:
-            - Name: CFNDeployServiceDiscovery
+            - Name: CFNDeployBootstrap
               ActionTypeId:
                 Category: Deploy
                 Owner: AWS
@@ -94,53 +94,8 @@ Resources:
                 - Name: InfraOut
               Configuration:
                 ActionMode: CREATE_UPDATE
-                StackName: !Sub 'boot-sd-#{variables.Service}-${Env}'
-                TemplatePath: 'InfraOut::ci/boot/templates/sd-stack.yaml'
-                RoleArn: !Ref CloudFormationDeployRoleArn
-                Capabilities: 'CAPABILITY_IAM,CAPABILITY_NAMED_IAM'
-                ParameterOverrides: !Sub |
-                  {
-                    "ServiceName": "#{variables.Service}",
-                    "Env": "${Env}",
-                    "NamespaceStackName": "infra-namespace"
-                  }
-
-        - Name: DeployLog
-          Actions:
-            - Name: CFNDeployLog
-              ActionTypeId:
-                Category: Deploy
-                Owner: AWS
-                Provider: CloudFormation
-                Version: '1'
-              InputArtifacts:
-                - Name: InfraOut
-              Configuration:
-                ActionMode: CREATE_UPDATE
-                StackName: !Sub 'boot-log-#{variables.Service}-${Env}'
-                TemplatePath: 'InfraOut::ci/boot/templates/log-stack.yaml'
-                RoleArn: !Ref CloudFormationDeployRoleArn
-                Capabilities: 'CAPABILITY_IAM,CAPABILITY_NAMED_IAM'
-                ParameterOverrides: !Sub |
-                  {
-                    "ServiceName": "#{variables.Service}",
-                    "Env": "${Env}"
-                  }
-
-        - Name: DeployAlb
-          Actions:
-            - Name: CFNDeployAlb
-              ActionTypeId:
-                Category: Deploy
-                Owner: AWS
-                Provider: CloudFormation
-                Version: '1'
-              InputArtifacts:
-                - Name: InfraOut
-              Configuration:
-                ActionMode: CREATE_UPDATE
-                StackName: !Sub 'boot-alb-#{variables.Service}-${Env}'
-                TemplatePath: 'InfraOut::ci/boot/templates/alb-stack.yaml'
+                StackName: !Sub 'boot-#{variables.Service}-${Env}'
+                TemplatePath: 'InfraOut::ci/boot/templates/boot-stack.yaml'
                 RoleArn: !Ref CloudFormationDeployRoleArn
                 Capabilities: 'CAPABILITY_IAM,CAPABILITY_NAMED_IAM'
                 ParameterOverrides: !Sub |

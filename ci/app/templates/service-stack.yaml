@@ -63,7 +63,7 @@ Resources:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
       Name: !Sub '${ServiceName}-${Env}-${Lane}-tg'
-      VpcId: !ImportValue infra-network-VpcId
+      VpcId: !ImportValue infra-environment-VpcId
       TargetType: ip
       Protocol: HTTP
       Port: !Ref WebServerPort
@@ -81,7 +81,7 @@ Resources:
     Properties:
       ListenerArn:
         Fn::ImportValue:
-          Fn::Sub: 'boot-alb-${ServiceName}-${Env}-HttpListenerArn'
+          Fn::Sub: 'boot-${ServiceName}-${Env}-HttpListenerArn'
       Priority: 100
       Conditions:
         - HttpHeaderConfig:
@@ -134,7 +134,7 @@ Resources:
             Options:
               awslogs-group:
                 Fn::ImportValue:
-                  Fn::Sub: 'boot-log-${ServiceName}-${Env}-LogGroupName'
+                  Fn::Sub: 'boot-${ServiceName}-${Env}-LogGroupName'
               awslogs-region: !Ref 'AWS::Region'
               awslogs-stream-prefix: !If
                 - LaneAsDefault
@@ -150,7 +150,7 @@ Resources:
         - !Sub '${ServiceName}-${Env}-${Lane}'
       Cluster:
         Fn::ImportValue:
-          Fn::Sub: 'ecs-cluster-${Env}-ClusterName'
+          Fn::Sub: 'infra-environment-ClusterName'
       LaunchType: FARGATE
       DesiredCount: !Ref DesiredCount
       TaskDefinition: !Ref TaskDef
@@ -162,12 +162,12 @@ Resources:
         MinimumHealthyPercent: 100
       NetworkConfiguration:
         AwsvpcConfiguration:
-          Subnets: !Split [ ",", { "Fn::ImportValue": "infra-network-PrivateSubnets" } ]
+          Subnets: !Split [ ",", { "Fn::ImportValue": "infra-environment-PrivateSubnets" } ]
           AssignPublicIp: ENABLED
       ServiceRegistries:
         - RegistryArn:
             Fn::ImportValue:
-              Fn::Sub: 'boot-sd-${ServiceName}-${Env}-service-arn'
+              Fn::Sub: 'boot-${ServiceName}-${Env}-${ServiceName}-service-arn'
           ContainerName: !Ref ServiceName
           ContainerPort: !Ref RpcServerPort
       EnableECSManagedTags: true
