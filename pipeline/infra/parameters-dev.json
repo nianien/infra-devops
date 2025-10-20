@@ -1,7 +1,7 @@
 [
   {
-    "ParameterKey": "PipelineName",
-    "ParameterValue": "infra"
+      "ParameterKey": "PipelineName",
+      "ParameterValue": "infra-init"
   },
   {
     "ParameterKey": "Env",
