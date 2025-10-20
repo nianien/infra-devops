@@ -86,7 +86,7 @@ Resources:
               Configuration:
                 ActionMode: CREATE_UPDATE
                 StackName: !Sub 'boot-sd-#{variables.Service}-#{variables.Env}'
-                TemplatePath: 'InfraOut::ci/sd-stack.yaml'
+                TemplatePath: 'InfraOut::ci/boot-sd-stack.yaml'
                 RoleArn: !Ref CloudFormationDeployRoleArn
                 Capabilities: 'CAPABILITY_IAM,CAPABILITY_NAMED_IAM'
                 ParameterOverrides: !Sub |
@@ -109,7 +109,7 @@ Resources:
               Configuration:
                 ActionMode: CREATE_UPDATE
                 StackName: !Sub 'boot-log-#{variables.Service}-#{variables.Env}'
-                TemplatePath: 'InfraOut::ci/log-stack.yaml'
+                TemplatePath: 'InfraOut::ci/boot-log-stack.yaml'
                 RoleArn: !Ref CloudFormationDeployRoleArn
                 Capabilities: 'CAPABILITY_IAM,CAPABILITY_NAMED_IAM'
                 ParameterOverrides: !Sub |
@@ -131,7 +131,7 @@ Resources:
               Configuration:
                 ActionMode: CREATE_UPDATE
                 StackName: !Sub 'boot-alb-#{variables.Service}-#{variables.Env}'
-                TemplatePath: 'InfraOut::ci/alb-stack.yaml'
+                TemplatePath: 'InfraOut::ci/boot-alb-stack.yaml'
                 RoleArn: !Ref CloudFormationDeployRoleArn
                 Capabilities: 'CAPABILITY_IAM,CAPABILITY_NAMED_IAM'
                 ParameterOverrides: !Sub |

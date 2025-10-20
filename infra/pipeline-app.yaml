@@ -190,7 +190,7 @@ Resources:
               Configuration:
                 ActionMode: CREATE_UPDATE
                 StackName: !Sub 'app-${ServiceName}-${Env}-#{variables.LANE}'
-                TemplatePath: 'InfraOut::ci/service-stack.yaml'
+                TemplatePath: 'InfraOut::ci/app-service-stack.yaml'
                 TemplateConfiguration: 'BuildOut::cfn-params.json'
                 RoleArn: !Ref CloudFormationDeployRoleArn
                 Capabilities: 'CAPABILITY_IAM,CAPABILITY_NAMED_IAM'
