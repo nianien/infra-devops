@@ -8,6 +8,10 @@
     "ParameterValue": "demo-web-api"
   },
   {
+    "ParameterKey": "ModulePath",
+    "ParameterValue": "test/demo-web-api"
+  },
+  {
     "ParameterKey": "AppRepo",
     "ParameterValue": "nianien/infra-experimental"
   },
@@ -40,16 +44,12 @@
     "ParameterValue": "aws/codebuild/standard:7.0"
   },
   {
-    "ParameterKey": "ModulePath",
-    "ParameterValue": "."
-  },
-  {
     "ParameterKey": "BuildSpec",
     "ParameterValue": "ci/buildspec.yaml"
   },
   {
     "ParameterKey": "DefaultBranch",
-    "ParameterValue": "main"
+    "ParameterValue": "master"
   },
   {
     "ParameterKey": "DefaultLane",

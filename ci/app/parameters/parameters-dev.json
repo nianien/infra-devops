@@ -8,6 +8,10 @@
     "ParameterValue": "demo-web-api"
   },
   {
+    "ParameterKey": "ModulePath",
+    "ParameterValue": "test/demo-web-api"
+  },
+  {
     "ParameterKey": "AppRepo",
     "ParameterValue": "nianien/infra-experimental"
   },
@@ -38,10 +42,6 @@
   {
     "ParameterKey": "ContainerImage",
     "ParameterValue": "aws/codebuild/standard:7.0"
-  },
-  {
-    "ParameterKey": "ModulePath",
-    "ParameterValue": "."
   },
   {
     "ParameterKey": "BuildSpec",
