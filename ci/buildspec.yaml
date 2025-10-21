@@ -6,6 +6,10 @@ env:
     MODULE_PATH: "."                  # 相对"应用仓库根"（AppOut）
     DOCKERFILE_PATH: "ci/Dockerfile"  # 相对"应用仓库根"（AppOut）
     SKIP_TESTS: "1"
+  # 跨 phase 变量传递
+  exported-variables:
+    - ECR_REPO_URI
+    - IMAGE_TAG_URI
 
 phases:
   install:
@@ -16,15 +20,18 @@ phases:
 
   pre_build:
     commands:
-      - . ci/prebuild.sh
+      - . ci/build.sh
+      - prebuild
 
   build:
     commands:
       - . ci/build.sh
+      - build
 
   post_build:
     commands:
-      - . ci/postbuild.sh
+      - . ci/build.sh
+      - postbuild
 
 artifacts:
   files:

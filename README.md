@@ -38,6 +38,7 @@ infra-devops/
 │   │   └── templates/           # 基础设施部署模板
 │   │       └── infra-stack.yaml
 │   ├── buildspec.yaml           # 统一构建规范
+│   ├── build.sh                 # 通用函数库 & 构建阶段函数
 │   ├── Dockerfile               # 构建环境镜像
 │   └── pipeline-deploy.sh       # 统一部署脚本
 ├── docs/                        # 项目文档
@@ -246,6 +247,103 @@ artifacts:
   files:
     - cfn-params.json   # 从主输入根目录打包
 ```
+
+### 模块化构建脚本
+
+系统采用"buildspec 只当入口，真正逻辑都在 build.sh"的干净设计：
+
+#### 脚本结构
+
+```
+ci/
+└── build.sh        # 通用函数库 & 构建阶段函数
+```
+
+#### 通用函数库 (build.sh)
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ---------- 错误处理 ----------
+trap 'echo "[ERR] line $LINENO: $BASH_COMMAND" >&2' ERR
+
+# ---------- 彩色日志函数 ----------
+info()  { echo -e "\033[36m==>\033[0m $*"; }
+warn()  { echo -e "\033[33m[WARN]\033[0m $*"; }
+fatal() { echo -e "\033[31m[FATAL]\033[0m $*" >&2; exit 1; }
+ok()    { echo -e "\033[32m✅\033[0m $*"; }
+
+# ---------- 路径设置 ----------
+ROOT="$(cd -- "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+APP_ROOT="${CODEBUILD_SRC_DIR_AppOut:-$ROOT}"     # 应用仓库根
+INFRA_ROOT="${CODEBUILD_SRC_DIR:-$ROOT}"          # 主输入根
+
+# ---------- 构建阶段函数 ----------
+prebuild() {
+  info "== Prebuild Phase =="
+  # 环境检查、ECR 登录、变量初始化
+}
+
+build() {
+  info "== Build Phase =="
+  # Maven 构建、Docker 打包、推送到 ECR
+}
+
+postbuild() {
+  info "== Postbuild Phase =="
+  # 生成 CloudFormation 参数文件
+}
+```
+
+#### 稳妥落地要点
+
+| 要点 | 实现 |
+|------|------|
+| **严格错误处理** | `set -euo pipefail` + `trap` 错误定位 |
+| **跨 phase 变量传递** | `exported-variables` + `export` 确保变量传递 |
+| **相对路径稳定** | `ROOT` 变量确保路径正确 |
+| **幂等性保证** | 函数式设计，避免全局副作用 |
+| **日志清晰** | 彩色日志 + 结构化输出 |
+
+#### 脚本使用最佳实践
+
+**buildspec.yaml 作为入口**：
+```yaml
+phases:
+  pre_build:
+    commands:
+      - . ci/build.sh
+      - prebuild
+
+  build:
+    commands:
+      - . ci/build.sh
+      - build
+
+  post_build:
+    commands:
+      - . ci/build.sh
+      - postbuild
+```
+
+**环境变量支持**：
+- `SERVICE_NAME`：服务名称（必需）
+- `APP_ENV`：应用环境（必需）
+- `LANE`：部署泳道（可选，默认 default）
+- `MODULE_PATH`：模块路径（可选，默认 .）
+- `DOCKERFILE_PATH`：Dockerfile 路径（可选，默认 Dockerfile）
+- `SKIP_TESTS`：跳过测试（可选，默认 1）
+- `DESIRED_COUNT`：期望实例数（可选，默认 1）
+- `CPU`：CPU 单位（可选，默认 512）
+- `MEMORY`：内存 MB（可选，默认 1024）
+
+**跨阶段变量传递**：
+通过 `exported-variables` 确保变量在构建阶段间正确传递：
+- `ECR_HOST`：ECR 主机地址
+- `ECR_REPO_URI`：ECR 仓库 URI
+- `IMAGE_TAG`：镜像标签
+- `IMAGE_TAG_URI`：完整镜像 URI
 
 ### 服务栈模板
 
