@@ -20,18 +20,15 @@ phases:
 
   pre_build:
     commands:
-      - . ci/build.sh
-      - prebuild
+      - '. ci/build.sh; prebuild'
 
   build:
     commands:
-      - . ci/build.sh
-      - build
+      - '. ci/build.sh; build'
 
   post_build:
     commands:
-      - . ci/build.sh
-      - postbuild
+      - '. ci/build.sh; postbuild'
 
 artifacts:
   files:
