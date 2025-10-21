@@ -198,7 +198,9 @@ postbuild() {
   info "Generating CloudFormation parameters file"
   cat >cfn-params.json <<EOF
 {
-  "ImageUri": "${IMAGE_TAG_URI}"
+  "Parameters": {
+    "ImageUri": "${IMAGE_TAG_URI}"
+  }
 }
 EOF
 
