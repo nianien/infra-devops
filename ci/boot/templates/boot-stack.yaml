@@ -19,7 +19,7 @@ Parameters:
 
   HealthCheckPath:
     Type: String
-    Default: '/health'
+    Default: '/'
     Description: 'Target group health check path'
 
   # Log Parameters
