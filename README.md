@@ -221,8 +221,12 @@ env:
   shell: bash
   variables:
     MODULE_PATH: "."                  # 相对"应用仓库根"（AppOut）
-    DOCKERFILE_PATH: "ci/Dockerfile"  # 相对"应用仓库根"（AppOut）
+    DOCKERFILE_PATH: "ci/Dockerfile"  # 相对"基础设施仓库根"（InfraOut）
     SKIP_TESTS: "1"
+  # 跨 phase 变量传递
+  exported-variables:
+    - ECR_REPO_URI
+    - IMAGE_TAG_URI
 
 phases:
   install:
@@ -233,15 +237,15 @@ phases:
 
   pre_build:
     commands:
-      - . ci/prebuild.sh
+      - '. ci/build.sh; prebuild'
 
   build:
     commands:
-      - . ci/build.sh
+      - '. ci/build.sh; build'
 
   post_build:
     commands:
-      - . ci/postbuild.sh
+      - '. ci/build.sh; postbuild'
 
 artifacts:
   files:
@@ -313,18 +317,15 @@ postbuild() {
 phases:
   pre_build:
     commands:
-      - . ci/build.sh
-      - prebuild
+      - '. ci/build.sh; prebuild'
 
   build:
     commands:
-      - . ci/build.sh
-      - build
+      - '. ci/build.sh; build'
 
   post_build:
     commands:
-      - . ci/build.sh
-      - postbuild
+      - '. ci/build.sh; postbuild'
 ```
 
 **环境变量支持**：
@@ -348,6 +349,17 @@ phases:
 - `DOCKERFILE_PATH`：Dockerfile 路径
 - `SKIP_TESTS`：跳过测试标志
 - `IMAGE_TAG_URI`：完整镜像 URI
+
+**CloudFormation 参数文件格式**：
+postbuild 阶段生成的 `cfn-params.json` 使用标准 CloudFormation 参数文件格式：
+```json
+{
+  "Parameters": {
+    "ImageUri": "297997107448.dkr.ecr.ap-southeast-2.amazonaws.com/demo-web-api:20251021095321.latest"
+  }
+}
+```
+此格式适用于 CodePipeline 的 `TemplateConfiguration` 和 AWS CLI 的 `--parameter-overrides file://` 参数。
 
 ### 服务栈模板
 
@@ -528,15 +540,12 @@ aws ecs describe-services \
 
 ## 📚 详细架构设计
 
-### 问题定义与解决方案
+### 设计目标
 
-#### 现状问题
-- 各服务的 CI/CD 模板分散在业务仓中，buildspec、pipeline.yaml、CFN 模板版本不统一
+通过双仓结构实现 DevOps 模板集中治理、业务代码独立演进。所有服务共享统一 buildspec.yaml 与 CloudFormation 模板，解决以下问题：
+- 各服务的 CI/CD 模板分散在业务仓中，版本不统一
 - DevOps 统一升级难、合规难、治理成本高
-- 希望在保持业务仓独立开发的前提下，集中统一 CI/CD 流程逻辑
-
-#### 目标方案
-通过双仓结构实现 DevOps 模板集中治理、业务代码独立演进。所有服务共享统一 buildspec.yaml 与 CloudFormation 模板。
+- 在保持业务仓独立开发的前提下，集中统一 CI/CD 流程逻辑
 
 ### 系统架构概览
 
@@ -1007,30 +1016,6 @@ aws cloudformation deploy \
   --capabilities CAPABILITY_IAM
 ```
 
-### 关键修复
-
-#### 1. ✅ Source 阶段分支引用修复
-```yaml
-# 修复前
-BranchName: !Ref BranchName  # ❌ BranchName 参数不存在
-
-# 修复后  
-BranchName: "#{variables.BRANCH}"  # ✅ 使用 Pipeline 变量
-```
-
-#### 2. ✅ ALB 栈模板路径修复
-```yaml
-# 修复前
-TemplatePath: 'SourceOut::ci/network-stack.yaml'  # ❌ 错误模板
-
-# 修复后
-TemplatePath: 'SourceOut::ci/alb-stack.yaml'  # ✅ 正确模板
-```
-
-#### 3. ✅ 共享栈并发问题解决
-- **问题**: 多个业务 Pipeline 同时更新共享栈导致 CFN 栈锁冲突
-- **解决**: 将共享栈迁出到独立的 Infrastructure Pipeline
-- **结果**: Service Pipeline 只部署应用栈，完全避免并发冲突
 
 ### 并发部署能力
 
