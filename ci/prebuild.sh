@@ -70,6 +70,6 @@ aws ecr describe-repositories --repository-names "${SERVICE_NAME}" --region "$AW
 aws ecr get-login-password --region "$AWS_REGION" \
 | docker login --username AWS --password-stdin "${ECR_REPO_URI%%/*}"
 
-echo "==> IMAGE_TAG_URI=IMAGE_TAG_URI"
+echo "==> IMAGE_TAG_URI=$IMAGE_TAG_URI"
 
 echo "Prebuild OK (no extra git operations)."
