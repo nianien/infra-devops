@@ -60,7 +60,8 @@ fi
 ECR_REPO_URI="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${SERVICE_NAME}"
 TIMESTAMP="$(date -u +%Y%m%d%H%M%S)"   # 用 UTC 更可复现
 IMAGE_TAG="${TIMESTAMP}.${COMMIT7:-latest}"
-export ECR_REPO_URI IMAGE_TAG
+IMAGE_TAG_URI="$ECR_REPO_URI:$IMAGE_TAG"
+export ECR_REPO_URI IMAGE_TAG IMAGE_TAG_URI
 
 echo "== Ensure ECR repo & login =="
 aws ecr describe-repositories --repository-names "${SERVICE_NAME}" --region "$AWS_REGION" >/dev/null 2>&1 \
@@ -69,7 +70,6 @@ aws ecr describe-repositories --repository-names "${SERVICE_NAME}" --region "$AW
 aws ecr get-login-password --region "$AWS_REGION" \
 | docker login --username AWS --password-stdin "${ECR_REPO_URI%%/*}"
 
-echo "==> IMAGE_TAG=$IMAGE_TAG"
-echo "==> ECR_REPO_URI=$ECR_REPO_URI"
+echo "==> IMAGE_TAG_URI=IMAGE_TAG_URI"
 
 echo "Prebuild OK (no extra git operations)."

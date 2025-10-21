@@ -8,6 +8,10 @@
     "ParameterValue": "dev"
   },
   {
+    "ParameterKey": "ServiceName",
+    "ParameterValue": "demo-web-api"
+  },
+  {
     "ParameterKey": "CloudFormationDeployRoleArn",
     "ParameterValue": "arn:aws:iam::297997107448:role/CloudFormationDeployRole"
   },
