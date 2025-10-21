@@ -93,7 +93,7 @@ Resources:
       HealthCheckPath: !Ref HealthCheckPath
       HealthCheckIntervalSeconds: 30
       HealthCheckTimeoutSeconds: 10
-      HealthyThresholdCount: 1
+      HealthyThresholdCount: 2
       UnhealthyThresholdCount: 2
 
   HttpListener:
