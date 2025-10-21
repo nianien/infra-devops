@@ -87,7 +87,7 @@ Resources:
       Port: !Ref WebServerPort
       HealthCheckEnabled: true
       HealthCheckProtocol: HTTP
-      HealthCheckPath: '/health'
+      HealthCheckPath: '/'
       HealthCheckIntervalSeconds: 30
       HealthCheckTimeoutSeconds: 5
       HealthyThresholdCount: 2
