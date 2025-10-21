@@ -87,7 +87,8 @@ Resources:
           Fn::Sub: 'boot-${ServiceName}-${Env}-HttpListenerArn'
       Priority: 100
       Conditions:
-        - HttpHeaderConfig:
+        - Field: http-header
+          HttpHeaderConfig:
             HttpHeaderName: 'tracestate'
             Values:
               - !Sub 'ctx=lane:${Lane}'
