@@ -1,7 +1,7 @@
 [
   {
     "ParameterKey": "PipelineName",
-    "ParameterValue": "demo-web-api"
+    "ParameterValue": "demo-user-rpc"
   },
   {
     "ParameterKey": "ServiceName",
