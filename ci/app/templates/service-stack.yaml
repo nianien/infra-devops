@@ -51,6 +51,11 @@ Parameters:
     AllowedValues: [ 'true', 'false' ]
     Description: 'Whether service supports RPC interface (use Cloud Map)'
 
+  HealthCheckPath:
+    Type: String
+    Default: '/'
+    Description: 'Health check path for ALB target group'
+
   WebServerPort:
     Type: Number
     Default: 8080
@@ -92,7 +97,7 @@ Resources:
       Port: !Ref WebServerPort
       HealthCheckEnabled: true
       HealthCheckProtocol: HTTP
-      HealthCheckPath: '/'
+      HealthCheckPath: !Ref HealthCheckPath
       HealthCheckIntervalSeconds: 30
       HealthCheckTimeoutSeconds: 5
       HealthyThresholdCount: 2

@@ -62,5 +62,13 @@
   {
     "ParameterKey": "SupportRpc",
     "ParameterValue": "false"
+  },
+  {
+    "ParameterKey": "HealthCheckGracePeriodSeconds",
+    "ParameterValue": "180"
+  },
+  {
+    "ParameterKey": "HealthCheckPath",
+    "ParameterValue": "/api/health"
   }
 ]

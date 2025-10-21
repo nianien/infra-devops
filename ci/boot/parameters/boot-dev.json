@@ -30,6 +30,10 @@
   {
     "ParameterKey": "RestartExecutionOnUpdate",
     "ParameterValue": "true"
+  },
+  {
+    "ParameterKey": "HealthCheckPath",
+    "ParameterValue": "/api/health"
   }
 ]
 

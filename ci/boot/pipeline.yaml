@@ -16,6 +16,11 @@ Parameters:
     AllowedValues: [ dev, test, preonline, online ]
     Description: 'Environment name'
 
+  HealthCheckPath:
+    Type: String
+    Default: '/'
+    Description: 'Health check path for ALB target group'
+
 
   # =========================================================
   # Optional Parameters
@@ -101,7 +106,8 @@ Resources:
                 ParameterOverrides: !Sub |
                   {
                     "ServiceName": "#{variables.Service}",
-                    "Env": "${Env}"
+                    "Env": "${Env}",
+                    "HealthCheckPath": "${HealthCheckPath}"
                   }
 
       RestartExecutionOnUpdate: !Ref RestartExecutionOnUpdate
