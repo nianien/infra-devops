@@ -7,6 +7,16 @@ Parameters:
     Default: dev
     Description: Environment name tag
 
+  WebServerPort:
+    Type: Number
+    Default: 8080
+    Description: 'Web server port'
+
+  RpcServerPort:
+    Type: Number
+    Default: 8081
+    Description: 'RPC server port'
+
   VpcCidr:
     Type: String
     Default: '10.0.0.0/16'
@@ -243,6 +253,53 @@ Resources:
         - Key: Environment
           Value: !Ref Env
 
+  # ===================== SHARED SECURITY GROUPS =====================
+  SharedAlbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub 'Shared ALB SG for ${Env}'
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0  # 显式放行到后端
+      Tags:
+        - Key: Name
+          Value: !Sub 'sg-alb-${Env}'
+        - Key: Environment
+          Value: !Ref Env
+
+  SharedEcsServiceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub 'Shared ECS Service SG for ${Env}'
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: !Ref WebServerPort
+          ToPort: !Ref WebServerPort
+          SourceSecurityGroupId: !Ref SharedAlbSecurityGroup   # 只允许来自 ALB
+        - IpProtocol: tcp
+          FromPort: !Ref RpcServerPort
+          ToPort: !Ref RpcServerPort
+          SourceSecurityGroupId: !Ref SharedEcsServiceSecurityGroup   # 允许 ECS 内部 gRPC 通信
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub 'sg-ecs-${Env}'
+        - Key: Environment
+          Value: !Ref Env
+
 Outputs:
   # VPC Outputs
   VpcId:
@@ -294,3 +351,16 @@ Outputs:
     Value: !Ref ECSCluster
     Export:
       Name: !Sub '${AWS::StackName}-ClusterArn'
+
+  # Security Group Outputs
+  SharedAlbSecurityGroupId:
+    Description: 'Shared ALB Security Group ID'
+    Value: !Ref SharedAlbSecurityGroup
+    Export:
+      Name: !Sub 'sg-alb-${Env}-id'
+
+  SharedEcsServiceSecurityGroupId:
+    Description: 'Shared ECS Service Security Group ID'
+    Value: !Ref SharedEcsServiceSecurityGroup
+    Export:
+      Name: !Sub 'sg-ecs-${Env}-id'

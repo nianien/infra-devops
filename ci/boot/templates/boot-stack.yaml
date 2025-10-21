@@ -14,7 +14,7 @@ Parameters:
   # ALB Parameters
   HealthCheckPort:
     Type: Number
-    Default: 8080
+    Default: 80
     Description: 'Target group health check port'
 
   HealthCheckPath:
@@ -50,22 +50,6 @@ Parameters:
     MaxValue: 10
 
 Resources:
-  # ===================== ALB SECURITY GROUP =====================
-  AlbSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: !Sub 'ALB SG for ${ServiceName}'
-      VpcId:
-        Fn::ImportValue:
-          Fn::Sub: 'infra-environment-${Env}-VpcId'
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 80
-          ToPort: 80
-          CidrIp: 0.0.0.0/0
-      Tags:
-        - Key: Name
-          Value: !Sub '${ServiceName}-alb-sg'
 
   # ===================== APPLICATION LOAD BALANCER =====================
   ApplicationLoadBalancer:
@@ -76,7 +60,8 @@ Resources:
       Type: application
       Subnets: !Split [ ',', { "Fn::ImportValue": { "Fn::Sub": "infra-environment-${Env}-PublicSubnets" } } ]
       SecurityGroups:
-        - !Ref AlbSecurityGroup
+        - Fn::ImportValue:
+            Fn::Sub: 'sg-alb-${Env}-id'
 
   DefaultTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
@@ -92,7 +77,7 @@ Resources:
       HealthCheckProtocol: HTTP
       HealthCheckPath: !Ref HealthCheckPath
       HealthCheckIntervalSeconds: 30
-      HealthCheckTimeoutSeconds: 10
+      HealthCheckTimeoutSeconds: 5
       HealthyThresholdCount: 2
       UnhealthyThresholdCount: 2
 
@@ -183,6 +168,7 @@ Outputs:
     Value: !Ref ServiceDiscoveryService
     Export:
       Name: !Sub '${AWS::StackName}-${ServiceName}-service-id'
+
 
   ServiceArn:
     Description: 'Service Discovery Service ARN'

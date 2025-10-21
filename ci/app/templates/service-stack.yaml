@@ -56,6 +56,11 @@ Parameters:
     Default: '/'
     Description: 'Health check path for ALB target group'
 
+  HealthCheckPort:
+    Type: Number
+    Default: 80
+    Description: 'Health check port for ALB target group'
+
   WebServerPort:
     Type: Number
     Default: 8080
@@ -66,10 +71,6 @@ Parameters:
     Default: 8081
     Description: 'RPC server port (registered to Cloud Map SRV record)'
 
-  HealthCheckGracePeriodSeconds:
-    Type: Number
-    Default: 120
-    Description: 'Health check grace period in seconds (time to wait before starting health checks)'
 
 Conditions:
   IsDefaultLane: !Or
@@ -94,14 +95,14 @@ Resources:
           Fn::Sub: 'infra-environment-${Env}-VpcId'
       TargetType: ip
       Protocol: HTTP
-      Port: !Ref WebServerPort
+      Port: !Ref HealthCheckPort
       HealthCheckEnabled: true
       HealthCheckProtocol: HTTP
       HealthCheckPath: !Ref HealthCheckPath
       HealthCheckIntervalSeconds: 30
       HealthCheckTimeoutSeconds: 5
       HealthyThresholdCount: 2
-      UnhealthyThresholdCount: 3
+      UnhealthyThresholdCount: 2
 
   LaneListenerRule:
     Type: AWS::ElasticLoadBalancingV2::ListenerRule
@@ -182,7 +183,6 @@ Resources:
           Fn::Sub: 'infra-environment-${Env}-ClusterName'
       LaunchType: FARGATE
       DesiredCount: !Ref DesiredCount
-      HealthCheckGracePeriodSeconds: !Ref HealthCheckGracePeriodSeconds
       TaskDefinition: !Ref TaskDef
       DeploymentConfiguration:
         DeploymentCircuitBreaker:
@@ -194,6 +194,9 @@ Resources:
         AwsvpcConfiguration:
           Subnets: !Split [ ",", { "Fn::ImportValue": { "Fn::Sub": "infra-environment-${Env}-PrivateSubnets" } } ]
           AssignPublicIp: ENABLED
+          SecurityGroups:
+            - Fn::ImportValue:
+                Fn::Sub: 'sg-ecs-${Env}-id'
       ServiceRegistries:
         - RegistryArn:
             Fn::ImportValue:

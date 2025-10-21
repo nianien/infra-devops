@@ -33,7 +33,11 @@
   },
   {
     "ParameterKey": "HealthCheckPath",
-    "ParameterValue": "/api/health"
+    "ParameterValue": "/"
+  },
+  {
+    "ParameterKey": "HealthCheckPort",
+    "ParameterValue": "80"
   }
 ]
 

@@ -64,11 +64,11 @@
     "ParameterValue": "false"
   },
   {
-    "ParameterKey": "HealthCheckGracePeriodSeconds",
-    "ParameterValue": "180"
+    "ParameterKey": "HealthCheckPath",
+    "ParameterValue": "/"
   },
   {
-    "ParameterKey": "HealthCheckPath",
-    "ParameterValue": "/api/health"
+    "ParameterKey": "HealthCheckPort",
+    "ParameterValue": "80"
   }
 ]
