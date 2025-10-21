@@ -5,7 +5,7 @@
   },
   {
     "ParameterKey": "ServiceName",
-    "ParameterValue": "demo-web-api"
+    "ParameterValue": "demo-user-rpc"
   },
   {
     "ParameterKey": "ModulePath",
