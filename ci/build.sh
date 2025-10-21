@@ -159,7 +159,8 @@ build() {
   info "Found JAR file: $REL_JAR"
 
   # Docker 构建
-  DF_ABS="$APP_ROOT/$DOCKERFILE_PATH"
+  DF_ABS="$INFRA_ROOT/$DOCKERFILE_PATH"
+  info "Looking for Dockerfile at: $DF_ABS"
   check_file "$DF_ABS" "Dockerfile"
 
   COMMIT7="$(

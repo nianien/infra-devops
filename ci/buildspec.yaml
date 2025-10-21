@@ -4,7 +4,7 @@ env:
   shell: bash
   variables:
     MODULE_PATH: "."                  # 相对"应用仓库根"（AppOut）
-    DOCKERFILE_PATH: "ci/Dockerfile"  # 相对"应用仓库根"（AppOut）
+    DOCKERFILE_PATH: "ci/Dockerfile"  # 相对"基础设施仓库根"（InfraOut）
     SKIP_TESTS: "1"
   # 跨 phase 变量传递
   exported-variables:

@@ -332,7 +332,7 @@ phases:
 - `APP_ENV`：应用环境（必需）
 - `LANE`：部署泳道（可选，默认 default）
 - `MODULE_PATH`：模块路径（可选，默认 .）
-- `DOCKERFILE_PATH`：Dockerfile 路径（可选，默认 Dockerfile）
+- `DOCKERFILE_PATH`：Dockerfile 路径（可选，默认 ci/Dockerfile，相对于基础设施仓库根）
 - `SKIP_TESTS`：跳过测试（可选，默认 1）
 - `DESIRED_COUNT`：期望实例数（可选，默认 1）
 - `CPU`：CPU 单位（可选，默认 512）
