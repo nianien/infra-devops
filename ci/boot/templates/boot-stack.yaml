@@ -91,10 +91,10 @@ Resources:
       HealthCheckEnabled: true
       HealthCheckProtocol: HTTP
       HealthCheckPath: !Ref HealthCheckPath
-      HealthCheckIntervalSeconds: 30
-      HealthCheckTimeoutSeconds: 5
+      HealthCheckIntervalSeconds: 60
+      HealthCheckTimeoutSeconds: 10
       HealthyThresholdCount: 2
-      UnhealthyThresholdCount: 3
+      UnhealthyThresholdCount: 5
 
   HttpListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
