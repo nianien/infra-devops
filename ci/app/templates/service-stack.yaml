@@ -61,6 +61,11 @@ Parameters:
     Default: 8081
     Description: 'RPC server port (registered to Cloud Map SRV record)'
 
+  HealthCheckGracePeriodSeconds:
+    Type: Number
+    Default: 120
+    Description: 'Health check grace period in seconds (time to wait before starting health checks)'
+
 Conditions:
   IsDefaultLane: !Or
     - !Equals [!Ref Lane, 'default']
@@ -172,6 +177,7 @@ Resources:
           Fn::Sub: 'infra-environment-${Env}-ClusterName'
       LaunchType: FARGATE
       DesiredCount: !Ref DesiredCount
+      HealthCheckGracePeriodSeconds: !Ref HealthCheckGracePeriodSeconds
       TaskDefinition: !Ref TaskDef
       DeploymentConfiguration:
         DeploymentCircuitBreaker:
