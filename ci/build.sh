@@ -107,9 +107,11 @@ prebuild() {
   check_dir "$INFRA_ROOT" "INFRA_ROOT"
 
   ECR_REPO_URI="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${SERVICE_NAME}"
-
+  TIMESTAMP="$(date +%Y%m%d%H%M%S)"
+  IMAGE_TAG="${TIMESTAMP}.${COMMIT7:-latest}"
+  IMAGE_TAG_URI="$ECR_REPO_URI:$IMAGE_TAG"
   # 导出变量
-  export ECR_REPO_URI
+  export ECR_REPO_URI IMAGE_TAG_URI
 
   # ECR 仓库存在性检查，不存在则创建
   info "Checking ECR repository: $SERVICE_NAME"
@@ -133,7 +135,7 @@ build() {
   info "== Build Phase =="
 
   # 验证必需的环境变量
-  validate_env "SERVICE_NAME" "ECR_REPO_URI" "MODULE_PATH"
+  validate_env "IMAGE_TAG_URI"
 
   # Maven 构建
   info "Building with Maven..."
@@ -164,10 +166,6 @@ build() {
     git -C "${APP_OUT_DIR:-$APP_ROOT}" rev-parse --short=7 HEAD 2>/dev/null ||
       echo "${CODEBUILD_RESOLVED_SOURCE_VERSION:-latest}" | cut -c1-7
   )"
-  TIMESTAMP="$(date +%Y%m%d%H%M%S)"
-  IMAGE_TAG="${TIMESTAMP}.${COMMIT7:-latest}"
-  IMAGE_TAG_URI="$ECR_REPO_URI:$IMAGE_TAG"
-  export IMAGE_TAG_URI
 
   info "Building Docker image: $IMAGE_TAG_URI"
   docker build \
@@ -180,12 +178,10 @@ build() {
   info "Pushing Docker image to ECR"
   docker push "$IMAGE_TAG_URI"
 
-  # 可选同步 latest 标签
-  if [[ ! "${IMAGE_TAG:-}" =~ (^|\.)(latest)$ ]]; then
-    echo "== Syncing tag :latest =="
-    docker tag "$IMAGE_TAG_URI" "${ECR_REPO_URI}:latest"
-    docker push "${ECR_REPO_URI}:latest"
-  fi
+  # 同步 latest 标签
+  echo "== Syncing tag :latest =="
+  docker tag "$IMAGE_TAG_URI" "${ECR_REPO_URI}:latest"
+  docker push "${ECR_REPO_URI}:latest"
 
   ok "Build phase completed successfully"
   info "Image pushed to ECR: $IMAGE_TAG_URI"
@@ -201,15 +197,7 @@ postbuild() {
   info "Generating CloudFormation parameters file"
   cat >cfn-params.json <<EOF
 {
-  "ServiceName": "${SERVICE_NAME}",
-  "Env": "${APP_ENV}",
-  "Lane": "${LANE:-default}",
-  "ImageUri": "${IMAGE_TAG_URI}",
-  "DesiredCount": ${DESIRED_COUNT:-1},
-  "Cpu": "${CPU:-512}",
-  "Memory": "${MEMORY:-1024}",
-  "WebServerPort": ${WEB_SERVER_PORT:-8080},
-  "RpcServerPort": ${RPC_SERVER_PORT:-8081}
+  "ImageUri": "${IMAGE_TAG_URI}"
 }
 EOF
 

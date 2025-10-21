@@ -340,9 +340,13 @@ phases:
 
 **跨阶段变量传递**：
 通过 `exported-variables` 确保变量在构建阶段间正确传递：
-- `ECR_HOST`：ECR 主机地址
+- `ROOT`：项目根目录
+- `APP_ROOT`：应用仓库根目录
+- `INFRA_ROOT`：基础设施仓库根目录
 - `ECR_REPO_URI`：ECR 仓库 URI
-- `IMAGE_TAG`：镜像标签
+- `MODULE_PATH`：模块路径
+- `DOCKERFILE_PATH`：Dockerfile 路径
+- `SKIP_TESTS`：跳过测试标志
 - `IMAGE_TAG_URI`：完整镜像 URI
 
 ### 服务栈模板

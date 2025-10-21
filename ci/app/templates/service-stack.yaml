@@ -149,7 +149,7 @@ Resources:
     Properties:
       ServiceName: !If
         - LaneAsDefault
-        - !Sub '${ServiceName}-${Env}-default'
+        - !Sub '${ServiceName}-${Env}'
         - !Sub '${ServiceName}-${Env}-${Lane}'
       Cluster:
         Fn::ImportValue:
