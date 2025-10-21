@@ -54,5 +54,13 @@
   {
     "ParameterKey": "DefaultLane",
     "ParameterValue": "default"
+  },
+  {
+    "ParameterKey": "SupportWeb",
+    "ParameterValue": "false"
+  },
+  {
+    "ParameterKey": "SupportRpc",
+    "ParameterValue": "true"
   }
 ]

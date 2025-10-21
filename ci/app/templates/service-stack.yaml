@@ -39,6 +39,18 @@ Parameters:
     AllowedValues: [ default, dev, test, preonline, online ]
     Description: 'Application environment (allowed: default, dev, test, preonline, online)'
 
+  SupportWeb:
+    Type: String
+    Default: 'true'
+    AllowedValues: [ 'true', 'false' ]
+    Description: 'Whether service supports Web interface (use ALB)'
+
+  SupportRpc:
+    Type: String
+    Default: 'false'
+    AllowedValues: [ 'true', 'false' ]
+    Description: 'Whether service supports RPC interface (use Cloud Map)'
+
   WebServerPort:
     Type: Number
     Default: 8080
@@ -52,16 +64,20 @@ Parameters:
 Conditions:
   LaneIsDefault: !Equals [ !Ref Lane, 'default' ]
   LaneIsEmpty: !Equals [ !Ref Lane, '' ]
-  LaneAsDefault: !Or
+  IsDefaultLane: !Or
     - !Equals [ !Ref Lane, 'default' ]
     - !Equals [ !Ref Lane, '' ]
-  NotLaneAsDefault: !Not
-    - !Condition LaneAsDefault
+  NotDefaultLane: !Not
+    - !Condition IsDefaultLane
+  IsWebService: !Equals [ !Ref SupportWeb, 'true' ]
+  IsRpcService: !Equals [ !Ref SupportRpc, 'true' ]
 
 Resources:
   LaneTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
-    Condition: NotLaneAsDefault
+    Condition: !And
+      - !Condition IsWebService
+      - !Condition NotDefaultLane
     Properties:
       Name: !Sub '${ServiceName}-${Env}-${Lane}-tg'
       VpcId:
@@ -80,7 +96,9 @@ Resources:
 
   LaneListenerRule:
     Type: AWS::ElasticLoadBalancingV2::ListenerRule
-    Condition: NotLaneAsDefault
+    Condition: !And
+      - !Condition IsWebService
+      - !Condition NotDefaultLane
     Properties:
       ListenerArn:
         Fn::ImportValue:
@@ -141,7 +159,7 @@ Resources:
                   Fn::Sub: 'boot-${ServiceName}-${Env}-LogGroupName'
               awslogs-region: !Ref 'AWS::Region'
               awslogs-stream-prefix: !If
-                - LaneAsDefault
+                - IsDefaultLane
                 - 'default'
                 - !Ref Lane
 
@@ -149,7 +167,7 @@ Resources:
     Type: AWS::ECS::Service
     Properties:
       ServiceName: !If
-        - LaneAsDefault
+        - IsDefaultLane
         - !Sub '${ServiceName}-${Env}'
         - !Sub '${ServiceName}-${Env}-${Lane}'
       Cluster:
@@ -180,15 +198,22 @@ Resources:
       DeploymentController:
         Type: ECS
       Tags: !If
-        - LaneAsDefault
+        - IsDefaultLane
         - !Ref 'AWS::NoValue'
         - - Key: Lane
             Value: !Ref Lane
       LoadBalancers: !If
-        - NotLaneAsDefault
-        - - TargetGroupArn: !Ref LaneTargetGroup
-            ContainerName: !Ref ServiceName
-            ContainerPort: !Ref WebServerPort
+        - IsWebService
+        - !If
+          - IsDefaultLane
+          - - TargetGroupArn:
+                Fn::ImportValue:
+                  Fn::Sub: 'boot-${ServiceName}-${Env}-DefaultTargetGroupArn'
+              ContainerName: !Ref ServiceName
+              ContainerPort: !Ref WebServerPort
+          - - TargetGroupArn: !Ref LaneTargetGroup
+              ContainerName: !Ref ServiceName
+              ContainerPort: !Ref WebServerPort
         - !Ref 'AWS::NoValue'
 
 Outputs:
@@ -203,7 +228,3 @@ Outputs:
     Value:
       Fn::ImportValue:
         Fn::Sub: 'boot-${ServiceName}-${Env}-${ServiceName}-service-arn'
-  TargetGroupArn:
-    Condition: NotLaneAsDefault
-    Description: 'Lane Target Group ARN'
-    Value: !Ref LaneTargetGroup
