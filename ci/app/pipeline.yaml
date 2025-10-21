@@ -40,6 +40,18 @@ Parameters:
     Default: 'default'
     Description: 'default lane name'
 
+  SupportWeb:
+    Type: String
+    Default: 'true'
+    AllowedValues: [ 'true', 'false' ]
+    Description: 'Whether service supports Web interface (use ALB)'
+
+  SupportRpc:
+    Type: String
+    Default: 'false'
+    AllowedValues: [ 'true', 'false' ]
+    Description: 'Whether service supports RPC interface (use Cloud Map)'
+
   ModulePath:
     Type: String
     Default: '.'
@@ -204,7 +216,9 @@ Resources:
                   {
                     "ServiceName": "${ServiceName}",
                     "Env": "${Env}",
-                    "Lane": "#{variables.LANE}"
+                    "Lane": "#{variables.LANE}",
+                    "SupportWeb": "${SupportWeb}",
+                    "SupportRpc": "${SupportRpc}"
                   }
 
       RestartExecutionOnUpdate: true
