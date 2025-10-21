@@ -62,22 +62,21 @@ Parameters:
     Description: 'RPC server port (registered to Cloud Map SRV record)'
 
 Conditions:
-  LaneIsDefault: !Equals [ !Ref Lane, 'default' ]
-  LaneIsEmpty: !Equals [ !Ref Lane, '' ]
   IsDefaultLane: !Or
-    - !Equals [ !Ref Lane, 'default' ]
-    - !Equals [ !Ref Lane, '' ]
+    - !Equals [!Ref Lane, 'default']
+    - !Equals [!Ref Lane, '']
   NotDefaultLane: !Not
     - !Condition IsDefaultLane
-  IsWebService: !Equals [ !Ref SupportWeb, 'true' ]
-  IsRpcService: !Equals [ !Ref SupportRpc, 'true' ]
+  IsWebService: !Equals [!Ref SupportWeb, 'true']
+  IsRpcService: !Equals [!Ref SupportRpc, 'true']
+  IsWebServiceAndNotDefaultLane: !And
+    - !Condition IsWebService
+    - !Condition NotDefaultLane
 
 Resources:
   LaneTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
-    Condition: !And
-      - !Condition IsWebService
-      - !Condition NotDefaultLane
+    Condition: IsWebServiceAndNotDefaultLane
     Properties:
       Name: !Sub '${ServiceName}-${Env}-${Lane}-tg'
       VpcId:
@@ -96,9 +95,7 @@ Resources:
 
   LaneListenerRule:
     Type: AWS::ElasticLoadBalancingV2::ListenerRule
-    Condition: !And
-      - !Condition IsWebService
-      - !Condition NotDefaultLane
+    Condition: IsWebServiceAndNotDefaultLane
     Properties:
       ListenerArn:
         Fn::ImportValue:
