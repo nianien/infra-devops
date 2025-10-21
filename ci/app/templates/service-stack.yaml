@@ -119,7 +119,7 @@ Resources:
   TaskDef:
     Type: AWS::ECS::TaskDefinition
     Properties:
-      Family: !Sub '${ServiceName}-${Lane}-${Env}-task'
+      Family: !Sub '${ServiceName}-${Env}-${Lane}-task'
       RequiresCompatibilities: [ FARGATE ]
       NetworkMode: awsvpc
       Cpu: !Ref Cpu
