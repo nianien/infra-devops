@@ -8,9 +8,3 @@ export AWS_PAGER="" # 防止 CLI 卡分页
 export AWS_PROFILE="${AWS_PROFILE:-nianien}"
 export AWS_REGION="${AWS_REGION:-ap-southeast-2}"
 export AWS_ACCOUNT_ID="${AWS_ACCOUNT_ID:-297997107448}"
-
-# =========================================================
-# 兼容性保留（可选）
-# =========================================================
-export CLUSTER="${CLUSTER:-demo-cluster}"
-export NAMESPACE_NAME="${NAMESPACE_NAME:-test.local}"
