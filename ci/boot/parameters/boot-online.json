@@ -5,7 +5,7 @@
   },
   {
     "ParameterKey": "Env",
-    "ParameterValue": "prod"
+    "ParameterValue": "online"
   },
   {
     "ParameterKey": "CloudFormationDeployRoleArn",
