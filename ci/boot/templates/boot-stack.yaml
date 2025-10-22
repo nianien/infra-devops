@@ -167,5 +167,5 @@ Outputs:
     Description: 'Service Discovery Service ARN'
     Value: !GetAtt ServiceDiscoveryService.Arn
     Export:
-      Name: !Sub '${AWS::StackName}-${ServiceName}-service-arn'
+      Name: !Sub '${AWS::StackName}-sd-service-arn'
 

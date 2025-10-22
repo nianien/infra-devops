@@ -200,7 +200,7 @@ Resources:
       ServiceRegistries:
         - RegistryArn:
             Fn::ImportValue:
-              Fn::Sub: 'boot-${ServiceName}-${Env}-${ServiceName}-service-arn'
+              Fn::Sub: 'boot-${ServiceName}-${Env}-sd-service-arn'
           ContainerName: !Ref ServiceName
           ContainerPort: !Ref RpcServerPort
       EnableECSManagedTags: true
@@ -238,4 +238,4 @@ Outputs:
     Description: 'Cloud Map Service ARN'
     Value:
       Fn::ImportValue:
-        Fn::Sub: 'boot-${ServiceName}-${Env}-${ServiceName}-service-arn'
+        Fn::Sub: 'boot-${ServiceName}-${Env}-sd-service-arn'
