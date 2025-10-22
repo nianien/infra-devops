@@ -49,11 +49,15 @@ Parameters:
     MinValue: 1
     MaxValue: 10
 
+Conditions:
+  ShouldCreateResources: !Not [!Equals [!Ref ServiceName, '-']]
+
 Resources:
 
   # ===================== APPLICATION LOAD BALANCER =====================
   ApplicationLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Condition: ShouldCreateResources
     Properties:
       Name: !Sub '${ServiceName}-${Env}-alb'
       Scheme: internet-facing
@@ -65,6 +69,7 @@ Resources:
 
   DefaultTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Condition: ShouldCreateResources
     Properties:
       Name: !Sub '${ServiceName}-${Env}-default-tg'
       VpcId:
@@ -83,6 +88,7 @@ Resources:
 
   HttpListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
+    Condition: ShouldCreateResources
     Properties:
       LoadBalancerArn: !Ref ApplicationLoadBalancer
       Port: 80
@@ -94,6 +100,7 @@ Resources:
   # ===================== CLOUDWATCH LOG GROUP =====================
   LogGroup:
     Type: AWS::Logs::LogGroup
+    Condition: ShouldCreateResources
     Properties:
       LogGroupName: !Sub '/ecs/${Env}/${ServiceName}'
       RetentionInDays: !Ref LogRetentionDays
@@ -108,6 +115,7 @@ Resources:
   # ===================== CLOUD MAP SERVICE =====================
   ServiceDiscoveryService:
     Type: AWS::ServiceDiscovery::Service
+    Condition: ShouldCreateResources
     Properties:
       Name: !Ref ServiceName
       NamespaceId:
@@ -133,61 +141,88 @@ Outputs:
   # ALB Outputs
   LoadBalancerArn:
     Description: 'Application Load Balancer ARN'
-    Value: !Ref ApplicationLoadBalancer
+    Value: !If
+      - ShouldCreateResources
+      - !Ref ApplicationLoadBalancer
+      - !Ref 'AWS::NoValue'
     Export:
       Name: !Sub '${AWS::StackName}-LoadBalancerArn'
 
   LoadBalancerDnsName:
     Description: 'Application Load Balancer DNS name'
-    Value: !GetAtt ApplicationLoadBalancer.DNSName
+    Value: !If
+      - ShouldCreateResources
+      - !GetAtt ApplicationLoadBalancer.DNSName
+      - !Ref 'AWS::NoValue'
     Export:
       Name: !Sub '${AWS::StackName}-DnsName'
 
   HttpListenerArn:
     Description: 'HTTP Listener ARN'
-    Value: !Ref HttpListener
+    Value: !If
+      - ShouldCreateResources
+      - !Ref HttpListener
+      - !Ref 'AWS::NoValue'
     Export:
       Name: !Sub '${AWS::StackName}-HttpListenerArn'
 
   DefaultTargetGroupArn:
     Description: 'Default Target Group ARN'
-    Value: !Ref DefaultTargetGroup
+    Value: !If
+      - ShouldCreateResources
+      - !Ref DefaultTargetGroup
+      - !Ref 'AWS::NoValue'
     Export:
       Name: !Sub '${AWS::StackName}-DefaultTargetGroupArn'
 
   # LogGroup Outputs
   LogGroupName:
     Description: 'CloudWatch Log Group Name'
-    Value: !Sub '/ecs/${Env}/${ServiceName}'
+    Value: !If
+      - ShouldCreateResources
+      - !Sub '/ecs/${Env}/${ServiceName}'
+      - !Ref 'AWS::NoValue'
     Export:
       Name: !Sub '${AWS::StackName}-LogGroupName'
 
   # Service Discovery Outputs
   SdServiceId:
     Description: 'Service Discovery Service ID'
-    Value: !Ref ServiceDiscoveryService
+    Value: !If
+      - ShouldCreateResources
+      - !Ref ServiceDiscoveryService
+      - !Ref 'AWS::NoValue'
     Export:
       Name: !Sub '${AWS::StackName}-${ServiceName}-service-id'
 
 
   ServiceArn:
     Description: 'Service Discovery Service ARN'
-    Value: !GetAtt ServiceDiscoveryService.Arn
+    Value: !If
+      - ShouldCreateResources
+      - !GetAtt ServiceDiscoveryService.Arn
+      - !Ref 'AWS::NoValue'
     Export:
       Name: !Sub '${AWS::StackName}-${ServiceName}-service-arn'
 
   ServiceName:
     Description: 'Service name'
-    Value: !Ref ServiceName
+    Value: !If
+      - ShouldCreateResources
+      - !Ref ServiceName
+      - !Ref 'AWS::NoValue'
     Export:
       Name: !Sub '${AWS::StackName}-${ServiceName}-service-name'
 
   DnsName:
     Description: 'DNS name for service discovery'
-    Value: !Sub
-      - '${ServiceName}.${NamespaceName}'
-      - NamespaceName:
-          Fn::ImportValue:
-            Fn::Sub: 'infra-environment-${Env}-namespace-name'
+    Value: !If
+      - ShouldCreateResources
+      - !Sub
+        - '${ServiceName}.${NamespaceName}'
+        - NamespaceName:
+            Fn::ImportValue:
+              Fn::Sub: 'infra-environment-${Env}-namespace-name'
+      - !Ref 'AWS::NoValue'
     Export:
       Name: !Sub '${AWS::StackName}-${ServiceName}-dns-name'
