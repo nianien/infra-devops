@@ -61,7 +61,7 @@ Resources:
       Subnets: !Split [ ',', { "Fn::ImportValue": { "Fn::Sub": "infra-environment-${Env}-PublicSubnets" } } ]
       SecurityGroups:
         - Fn::ImportValue:
-            Fn::Sub: 'sg-alb-${Env}-id'
+            Fn::Sub: '${Env}-alb-sg-id'
 
   DefaultTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup

@@ -273,7 +273,7 @@ Resources:
           CidrIp: 0.0.0.0/0  # 显式放行到后端
       Tags:
         - Key: Name
-          Value: !Sub 'sg-alb-${Env}'
+          Value: !Sub '${Env}-alb-sg'
         - Key: Environment
           Value: !Ref Env
 
@@ -290,13 +290,13 @@ Resources:
         - IpProtocol: tcp
           FromPort: !Ref RpcServerPort
           ToPort: !Ref RpcServerPort
-          SourceSecurityGroupId: !Ref SharedEcsServiceSecurityGroup   # 允许 ECS 内部 gRPC 通信
+          CidrIp: !Ref VpcCidr   # 允许 VPC 内部 gRPC 通信
       SecurityGroupEgress:
         - IpProtocol: -1
           CidrIp: 0.0.0.0/0
       Tags:
         - Key: Name
-          Value: !Sub 'sg-ecs-${Env}'
+          Value: !Sub '${Env}-ecs-sg'
         - Key: Environment
           Value: !Ref Env
 
@@ -357,10 +357,10 @@ Outputs:
     Description: 'Shared ALB Security Group ID'
     Value: !Ref SharedAlbSecurityGroup
     Export:
-      Name: !Sub 'sg-alb-${Env}-id'
+      Name: !Sub '${Env}-alb-sg-id'
 
   SharedEcsServiceSecurityGroupId:
     Description: 'Shared ECS Service Security Group ID'
     Value: !Ref SharedEcsServiceSecurityGroup
     Export:
-      Name: !Sub 'sg-ecs-${Env}-id'
+      Name: !Sub '${Env}-ecs-sg-id'

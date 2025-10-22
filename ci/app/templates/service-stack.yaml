@@ -196,7 +196,7 @@ Resources:
           AssignPublicIp: ENABLED
           SecurityGroups:
             - Fn::ImportValue:
-                Fn::Sub: 'sg-ecs-${Env}-id'
+                Fn::Sub: '${Env}-ecs-sg-id'
       ServiceRegistries:
         - RegistryArn:
             Fn::ImportValue:
