@@ -8,12 +8,29 @@
 # shellcheck source=/dev/null
 . "$(dirname "$0")/env.sh"
 
-# 需要管理的服务列表
-SERVICES=(
-  "demo-order-rpc-default"
-  "demo-user-rpc-default"
-  "demo-web-api-default"
-)
+# 自动获取服务列表
+get_services() {
+  aws ecs list-services \
+    --cluster "$CLUSTER" \
+    --region "$AWS_REGION" \
+    --profile "$AWS_PROFILE" \
+    --query 'serviceArns[]' \
+    --output text | tr '\t' '\n' | sed 's/.*\///g' | sort
+}
+
+# 如果用户指定了 SERVICES 环境变量，则使用它；否则自动获取
+if [[ -n "${SERVICES:-}" ]]; then
+  # 将空格分隔的字符串转换为数组
+  read -ra SERVICES <<< "$SERVICES"
+  echo "Using manually specified services: ${SERVICES[*]}"
+else
+  # 自动获取所有服务
+  SERVICES=()
+  while IFS= read -r service; do
+    SERVICES+=("$service")
+  done < <(get_services)
+  echo "Auto-detected services: ${SERVICES[*]}"
+fi
 
 usage() {
   cat <<EOF
@@ -26,7 +43,11 @@ Env:
   AWS_PROFILE (default: $AWS_PROFILE)
   AWS_REGION  (default: $AWS_REGION)
   CLUSTER     (default: $CLUSTER)
-  SERVICES    (space-separated list to override services)
+  SERVICES    (space-separated list to override auto-detected services)
+
+Note:
+  - Services are auto-detected from the cluster by default
+  - Use SERVICES env var to override: SERVICES="service1 service2" $0 start
 EOF
 }
 
