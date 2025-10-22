@@ -51,8 +51,15 @@ Parameters:
 
 Conditions:
   ShouldCreateResources: !Not [!Equals [!Ref ServiceName, '-']]
+  ShouldCreateDummy: !Equals [!Ref ServiceName, '-']
 
 Resources:
+
+  # ===================== DUMMY RESOURCE (ONLY WHEN ServiceName='-') =====================
+  DummyResource:
+    Type: AWS::CloudFormation::WaitConditionHandle
+    Condition: ShouldCreateDummy
+    Properties: {}
 
   # ===================== APPLICATION LOAD BALANCER =====================
   ApplicationLoadBalancer:
