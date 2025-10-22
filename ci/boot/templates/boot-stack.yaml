@@ -139,20 +139,6 @@ Resources:
 
 Outputs:
   # ALB Outputs
-  LoadBalancerArn:
-    Condition: ShouldCreateResources
-    Description: 'Application Load Balancer ARN'
-    Value: !Ref ApplicationLoadBalancer
-    Export:
-      Name: !Sub '${AWS::StackName}-LoadBalancerArn'
-
-  LoadBalancerDnsName:
-    Condition: ShouldCreateResources
-    Description: 'Application Load Balancer DNS name'
-    Value: !GetAtt ApplicationLoadBalancer.DNSName
-    Export:
-      Name: !Sub '${AWS::StackName}-DnsName'
-
   HttpListenerArn:
     Condition: ShouldCreateResources
     Description: 'HTTP Listener ARN'
@@ -176,14 +162,6 @@ Outputs:
       Name: !Sub '${AWS::StackName}-LogGroupName'
 
   # Service Discovery Outputs
-  SdServiceId:
-    Condition: ShouldCreateResources
-    Description: 'Service Discovery Service ID'
-    Value: !Ref ServiceDiscoveryService
-    Export:
-      Name: !Sub '${AWS::StackName}-${ServiceName}-service-id'
-
-
   ServiceArn:
     Condition: ShouldCreateResources
     Description: 'Service Discovery Service ARN'
@@ -191,20 +169,3 @@ Outputs:
     Export:
       Name: !Sub '${AWS::StackName}-${ServiceName}-service-arn'
 
-  ServiceName:
-    Condition: ShouldCreateResources
-    Description: 'Service name'
-    Value: !Ref ServiceName
-    Export:
-      Name: !Sub '${AWS::StackName}-${ServiceName}-service-name'
-
-  DnsName:
-    Condition: ShouldCreateResources
-    Description: 'DNS name for service discovery'
-    Value: !Sub
-      - '${ServiceName}.${NamespaceName}'
-      - NamespaceName:
-          Fn::ImportValue:
-            Fn::Sub: 'infra-environment-${Env}-namespace-name'
-    Export:
-      Name: !Sub '${AWS::StackName}-${ServiceName}-dns-name'
