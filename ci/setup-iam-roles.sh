@@ -136,6 +136,36 @@ JSON
 )
 put_inline_policy "$CP_ROLE_NAME" "S3FullAllPipelineArtifactBuckets" "$CP_S3_EXTRA_JSON"
 
+# CodePipeline 广泛权限策略（匹配线上实际配置）
+CP_EXTENSIVE_JSON=$(json_file <<JSON
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:GetBucketLocation",
+        "codebuild:BatchGetBuilds",
+        "codebuild:StartBuild",
+        "cloudformation:*",
+        "codestar-connections:UseConnection",
+        "iam:PassRole",
+        "ecs:*",
+        "ecr:*",
+        "logs:*",
+        "lambda:*",
+        "sts:AssumeRole"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+JSON
+)
+put_inline_policy "$CP_ROLE_NAME" "inline-codepipeline-policy" "$CP_EXTENSIVE_JSON"
+
 # =====================================================================================
 # 三、CodeBuildRole
 #   - 需要从 artifact 桶读取输入、写出输出；需要 ECR & Logs
@@ -184,6 +214,39 @@ CB_INLINE_JSON=$(json_file <<JSON
         "ecr:CompleteLayerUpload"
       ],
       "Resource": "*"
+    },
+    {
+      "Sid": "S3ArtifactsRead",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:GetObjectVersion",
+        "s3:GetBucketVersioning"
+      ],
+      "Resource": [
+        "arn:aws:s3:::codepipeline-*/*"
+      ]
+    },
+    {
+      "Sid": "S3ArtifactsList",
+      "Effect": "Allow",
+      "Action": [
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::codepipeline-*"
+      ]
+    },
+    {
+      "Sid": "S3ArtifactsWriteOptional",
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject",
+        "s3:PutObjectAcl"
+      ],
+      "Resource": [
+        "arn:aws:s3:::codepipeline-*/*"
+      ]
     }
   ]
 }
@@ -231,6 +294,97 @@ CB_GITHUB_JSON=$(json_file <<JSON
 JSON
 )
 put_inline_policy "$CB_ROLE_NAME" "CodeBuildGitHubAccess" "$CB_GITHUB_JSON"
+
+# CodeBuild ECR 创建仓库权限
+CB_ECR_CREATE_JSON=$(json_file <<JSON
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "EcrCreateRepoAll",
+      "Effect": "Allow",
+      "Action": [
+        "ecr:CreateRepository",
+        "ecr:DescribeRepositories"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+JSON
+)
+put_inline_policy "$CB_ROLE_NAME" "CodeBuildEcrCreateRepo" "$CB_ECR_CREATE_JSON"
+
+# CodeBuild Pipeline 访问权限
+CB_PIPELINE_ACCESS_JSON=$(json_file <<JSON
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "CodePipelineAccess",
+      "Effect": "Allow",
+      "Action": [
+        "codepipeline:GetPipeline",
+        "codepipeline:GetPipelineState",
+        "codepipeline:GetPipelineExecution",
+        "codepipeline:ListPipelineExecutions"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+JSON
+)
+put_inline_policy "$CB_ROLE_NAME" "CodeBuildPipelineAccess" "$CB_PIPELINE_ACCESS_JSON"
+
+# CodeBuild KMS 访问权限
+CB_KMS_ACCESS_JSON=$(json_file <<JSON
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "KmsAccess",
+      "Effect": "Allow",
+      "Action": [
+        "kms:Decrypt",
+        "kms:DescribeKey",
+        "kms:Encrypt",
+        "kms:GenerateDataKey*",
+        "kms:ReEncrypt*"
+      ],
+      "Resource": [
+        "arn:aws:kms:${AWS_REGION}:${ACCOUNT_ID}:alias/aws/s3",
+        "arn:aws:kms:${AWS_REGION}:${ACCOUNT_ID}:key/*"
+      ]
+    }
+  ]
+}
+JSON
+)
+put_inline_policy "$CB_ROLE_NAME" "CodeBuildKmsAccess" "$CB_KMS_ACCESS_JSON"
+
+# CodeBuild CodeArtifact 访问权限（可选）
+CB_CODEARTIFACT_JSON=$(json_file <<JSON
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "CodeArtifactAccess",
+      "Effect": "Allow",
+      "Action": [
+        "codeartifact:GetAuthorizationToken",
+        "codeartifact:GetRepositoryEndpoint",
+        "codeartifact:ReadFromRepository",
+        "codeartifact:DescribeDomain",
+        "codeartifact:DescribeRepository"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+JSON
+)
+put_inline_policy "$CB_ROLE_NAME" "CodeBuildCodeArtifactAccess" "$CB_CODEARTIFACT_JSON"
 
 # 可选托管策略
 attach_managed_if_missing "$CB_ROLE_NAME" "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser"
